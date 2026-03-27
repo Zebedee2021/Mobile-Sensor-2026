@@ -23,6 +23,11 @@
 
 ### MEMS 电容式加速度计
 
+<figure markdown="span">
+  ![MEMS 电容式加速度计结构](../../assets/images/mems-accelerometer.png){ width="640" }
+  <figcaption>MEMS 电容式加速度计芯片内部结构示意</figcaption>
+</figure>
+
 现代手机使用的是 **MEMS 电容式** 加速度计,其核心结构为差分电容:
 
 ```

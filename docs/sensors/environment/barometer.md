@@ -63,6 +63,11 @@ $$C = \varepsilon \frac{A}{d}$$
 
 ## 气压与海拔的关系
 
+<figure markdown="span">
+  ![气压与海拔关系](../../assets/images/barometer-altitude.png){ width="640" }
+  <figcaption>大气压力随海拔升高而降低</figcaption>
+</figure>
+
 ### 气压高度公式
 
 在标准大气条件下,海拔每升高约 8.4 m,气压下降约 1 hPa:

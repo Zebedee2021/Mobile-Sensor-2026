@@ -1,5 +1,10 @@
 # 面部识别传感器
 
+<figure markdown="span">
+  ![Face ID TrueDepth 系统](../../assets/images/face-id-truedepth.png){ width="680" }
+  <figcaption>Apple Face ID TrueDepth 结构光系统原理</figcaption>
+</figure>
+
 ## Apple Face ID (TrueDepth 系统)
 
 ### 硬件组成

@@ -1,5 +1,10 @@
 # ToF 与 LiDAR
 
+<figure markdown="span">
+  ![LiDAR 深度扫描](../../assets/images/lidar-scanning.png){ width="680" }
+  <figcaption>智能手机 LiDAR 扫描仪的深度感知原理</figcaption>
+</figure>
+
 ## ToF 传感器 (Time of Flight)
 
 ### 基本信息

@@ -19,6 +19,11 @@
 
 ### 科氏力效应
 
+<figure markdown="span">
+  ![陀螺仪科氏力效应原理](../../assets/images/gyroscope-coriolis.png){ width="640" }
+  <figcaption>MEMS 陀螺仪的科氏力效应原理</figcaption>
+</figure>
+
 MEMS 陀螺仪基于 **科氏力 (Coriolis Effect)** 原理:当一个质量块在某方向上振动,同时系统绕另一个轴旋转时,质量块会受到垂直于振动方向和旋转轴的科氏力:
 
 $$\vec{F}_{Coriolis} = -2m(\vec{\Omega} \times \vec{v})$$

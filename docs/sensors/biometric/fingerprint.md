@@ -1,5 +1,10 @@
 # 指纹传感器 (Fingerprint Sensor)
 
+<figure markdown="span">
+  ![三种指纹传感器技术对比](../../assets/images/fingerprint-types.png){ width="720" }
+  <figcaption>电容式、光学屏下、超声波屏下三种指纹传感器原理对比</figcaption>
+</figure>
+
 ## 三种主流技术
 
 ### 1. 电容式指纹传感器

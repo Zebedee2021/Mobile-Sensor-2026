@@ -1,5 +1,10 @@
 # GNSS 定位 (Global Navigation Satellite System)
 
+<figure markdown="span">
+  ![GNSS 卫星定位原理](../../assets/images/gnss-positioning.png){ width="680" }
+  <figcaption>多星座 GNSS 卫星三球交汇定位原理</figcaption>
+</figure>
+
 ## 基本信息
 
 | 属性 | 值 |

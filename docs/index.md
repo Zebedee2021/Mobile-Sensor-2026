@@ -2,6 +2,11 @@
 
 > 智能手机内置传感器 —— 原理、硬件与编程实践
 
+<figure markdown="span">
+  ![智能手机传感器总览](assets/images/sensor-overview.png){ width="720" }
+  <figcaption>现代智能手机内置的各类传感器</figcaption>
+</figure>
+
 ---
 
 ## 课程简介
