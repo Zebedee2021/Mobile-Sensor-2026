@@ -1,0 +1,113 @@
+site_name: 手机传感器技术
+site_description: 智能手机内置传感器 —— 原理、硬件与编程实践
+site_author: Zhiguo Zhou
+site_url: https://zebedee2021.github.io/Mobile-Sensor-2026/
+
+repo_name: Zebedee2021/Mobile-Sensor-2026
+repo_url: https://github.com/Zebedee2021/Mobile-Sensor-2026
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换至暗色模式
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换至亮色模式
+  font:
+    text: Noto Sans SC
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - footnotes
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.arithmatex:
+      generic: true
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+extra_javascript:
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Zebedee2021
+
+copyright: Copyright &copy; 2026 Zhiguo Zhou
+
+nav:
+  - 首页: index.md
+  - 传感器总览: sensors/overview.md
+  - 运动类传感器:
+    - sensors/motion/index.md
+    - 加速度计: sensors/motion/accelerometer.md
+    - 陀螺仪: sensors/motion/gyroscope.md
+    - 磁力计: sensors/motion/magnetometer.md
+  - 环境类传感器:
+    - sensors/environment/index.md
+    - 气压计: sensors/environment/barometer.md
+    - 环境光传感器: sensors/environment/light.md
+    - 温湿度传感器: sensors/environment/temperature.md
+  - 位置与距离:
+    - sensors/position/index.md
+    - GNSS 定位: sensors/position/gnss.md
+    - 接近传感器: sensors/position/proximity.md
+    - ToF 与 LiDAR: sensors/position/tof-lidar.md
+  - 生物识别:
+    - sensors/biometric/index.md
+    - 指纹传感器: sensors/biometric/fingerprint.md
+    - 面部识别: sensors/biometric/face.md
+    - 心率与血氧: sensors/biometric/health.md
+  - 通信与其他:
+    - sensors/others/index.md
+    - NFC: sensors/others/nfc.md
+    - UWB: sensors/others/uwb.md
+    - 霍尔与红外: sensors/others/hall-ir.md
+  - 编程接口:
+    - programming/index.md
+    - Android 传感器 API: programming/android.md
+    - iOS Core Motion: programming/ios.md
+  - 实验实践:
+    - practice/index.md
+    - SensorLog 使用指南: practice/sensorlog.md
+    - 数据采集实验: practice/data-collection.md
