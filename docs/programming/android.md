@@ -1,5 +1,10 @@
 # Android 传感器 API
 
+<figure markdown="span">
+  ![Android 传感器框架](../assets/images/android-sensor-framework.png){ width="560" }
+  <figcaption>Android 传感器框架分层架构：应用层 → 框架层 → HAL 层 → 硬件层</figcaption>
+</figure>
+
 ## 框架概述
 
 Android 传感器框架位于 `android.hardware` 包中,核心类:

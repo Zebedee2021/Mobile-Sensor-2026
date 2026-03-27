@@ -18,11 +18,7 @@
 
 ### 数据处理工具链
 
-```
-手机传感器 App → CSV/JSON 导出 → Python 分析 → 可视化/报告
-                    │
-                    ├── pandas (数据处理)
-                    ├── matplotlib (绑图)
-                    ├── scipy (信号处理)
-                    └── numpy (数值计算)
-```
+<figure markdown="span">
+  ![数据处理工具链](../assets/images/data-pipeline.png){ width="720" }
+  <figcaption>传感器数据采集与分析工具链：手机 App → CSV 导出 → Python 分析 → 可视化</figcaption>
+</figure>

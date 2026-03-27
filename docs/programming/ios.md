@@ -1,5 +1,10 @@
 # iOS Core Motion
 
+<figure markdown="span">
+  ![iOS Core Motion 框架](../assets/images/ios-coremotion-framework.png){ width="560" }
+  <figcaption>iOS Core Motion 框架架构：CMMotionManager、CMAltimeter、CMPedometer</figcaption>
+</figure>
+
 ## 框架概述
 
 iOS 的传感器数据主要通过以下框架访问:

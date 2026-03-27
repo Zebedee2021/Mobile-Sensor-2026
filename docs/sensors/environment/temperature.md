@@ -1,5 +1,10 @@
 # 温湿度传感器
 
+<figure markdown="span">
+  ![温度传感器原理](../../assets/images/temperature-sensor.png){ width="680" }
+  <figcaption>PN 结温度传感器与 NTC 热敏电阻工作原理</figcaption>
+</figure>
+
 ## 温度传感器
 
 ### 基本信息

@@ -38,13 +38,10 @@
 
 ### 信号处理流程
 
-```
-原始 PPG 信号 → 带通滤波 (0.5-4 Hz) → 峰值检测 → 计算 RR 间期 → 心率 BPM
-                   │
-                   ├── 运动伪迹去除 (加速度计辅助)
-                   │
-                   └── 自适应降噪
-```
+<figure markdown="span">
+  ![PPG 信号处理流程](../../assets/images/ppg-signal-processing.png){ width="680" }
+  <figcaption>PPG 信号处理管线：从原始信号到心率 BPM</figcaption>
+</figure>
 
 心率计算:
 

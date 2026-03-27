@@ -1,5 +1,10 @@
 # 环境光传感器 (Ambient Light Sensor)
 
+<figure markdown="span">
+  ![环境光传感器原理](../../assets/images/ambient-light-sensor.png){ width="680" }
+  <figcaption>环境光传感器多通道光谱响应原理</figcaption>
+</figure>
+
 ## 基本信息
 
 | 属性 | 值 |

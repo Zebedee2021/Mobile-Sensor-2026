@@ -1,5 +1,10 @@
 # 数据采集实验
 
+<figure markdown="span">
+  ![计步器加速度波形](../assets/images/step-counter-waveform.png){ width="720" }
+  <figcaption>基于加速度计的计步原理：合成加速度周期性波形与峰值检测</figcaption>
+</figure>
+
 ## 实验一: 计步器
 
 ### 实验目标

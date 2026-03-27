@@ -1,5 +1,10 @@
 # SensorLog 使用指南
 
+<figure markdown="span">
+  ![SensorLog 工作流程](../assets/images/sensorlog-workflow.png){ width="720" }
+  <figcaption>SensorLog 数据采集工作流程：配置 → 记录 → 导出 → 分析</figcaption>
+</figure>
+
 ## App 简介
 
 | 属性 | 值 |

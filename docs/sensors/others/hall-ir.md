@@ -51,13 +51,10 @@ $$V_H = \frac{I \cdot B}{n \cdot e \cdot d}$$
 
 红外遥控使用 **脉宽调制 (PWM)** 编码:
 
-```
-38kHz 载波:  ╥╥╥╥╥╥╥     ╥╥╥╥╥╥╥╥╥╥╥     ╥╥╥╥╥╥╥
-             ║║║║║║║     ║║║║║║║║║║║     ║║║║║║║
-             ╨╨╨╨╨╨╨     ╨╨╨╨╨╨╨╨╨╨╨     ╨╨╨╨╨╨╨
-             └ 短脉冲 ┘   └── 长脉冲 ──┘   └ 短脉冲 ┘
-                "0"            "1"            "0"
-```
+<figure markdown="span">
+  ![红外遥控 PWM 编码](../../assets/images/ir-pwm-encoding.png){ width="640" }
+  <figcaption>红外遥控 38kHz 载波脉宽调制编码 (NEC 协议)</figcaption>
+</figure>
 
 ### 常见遥控协议
 

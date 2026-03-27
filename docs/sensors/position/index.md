@@ -17,15 +17,7 @@
 
 ## 测距技术对比
 
-```
-精度     ← 高                              低 →
-         mm          cm          m          km
-          │           │           │           │
-   LiDAR ■■■■■        │           │           │
-     ToF ■■■■■■       │           │           │
-  接近    │     ■■■■■■ │           │           │
-    UWB   │  ■■■■■■■■  │           │           │
-   GNSS   │           │   ■■■■■■■■■           │
-  Wi-Fi   │           │ ■■■■■■■■  │           │
-  蜂窝    │           │           ■■■■■■■■■■■ │
-```
+<figure markdown="span">
+  ![测距技术对比](../../assets/images/ranging-comparison.png){ width="720" }
+  <figcaption>各测距技术的有效范围与精度对比</figcaption>
+</figure>

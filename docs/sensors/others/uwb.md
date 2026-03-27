@@ -20,13 +20,10 @@ UWB 使用极短的时间脉冲 (纳秒级) 进行通信和测距:
 
 ### 脉冲信号特征
 
-```
-传统窄带信号:     ∼∼∼∼∼∼∼∼∼∼∼∼∼∼∼∼∼∼∼∼∼∼  (连续正弦波)
-
-UWB 脉冲信号:     ╷   ╷   ╷   ╷   ╷   ╷    (极短脉冲,宽带)
-                   │   │   │   │   │   │
-                   ▼   ▼   ▼   ▼   ▼   ▼
-```
+<figure markdown="span">
+  ![UWB 脉冲信号特征](../../assets/images/uwb-pulse-signal.png){ width="640" }
+  <figcaption>UWB 极短脉冲信号 vs 传统窄带连续信号对比</figcaption>
+</figure>
 
 ### 双向测距 (TWR)
 
