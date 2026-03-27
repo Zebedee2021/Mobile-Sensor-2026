@@ -1,4 +1,4 @@
-# Sensor Logger 使用与上云指南
+# Sensor Logger 使用指南
 
 <figure markdown="span">
   ![Sensor Logger 数据上云架构](../assets/images/sensor-logger-cloud.png){ width="780" }

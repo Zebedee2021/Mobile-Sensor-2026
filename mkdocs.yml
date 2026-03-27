@@ -110,5 +110,5 @@ nav:
   - 实验实践:
     - practice/index.md
     - SensorLog 使用指南: practice/sensorlog.md
-    - Sensor Logger 使用与上云: practice/sensor-logger.md
+    - Sensor Logger 使用指南: practice/sensor-logger.md
     - 数据采集实验: practice/data-collection.md
