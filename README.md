@@ -5,6 +5,7 @@
 [![Deploy](https://github.com/Zebedee2021/Mobile-Sensor-2026/actions/workflows/deploy.yml/badge.svg)](https://github.com/Zebedee2021/Mobile-Sensor-2026/actions/workflows/deploy.yml)
 [![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://zebedee2021.github.io/Mobile-Sensor-2026/)
 [![License](https://img.shields.io/badge/license-CC%20BY--SA%204.0-lightgrey)](https://creativecommons.org/licenses/by-sa/4.0/)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Zebedee2021/Mobile-Sensor-2026/blob/main/notebooks/sensor_demo.ipynb)
 
 **在线阅读** :point_right: <https://zebedee2021.github.io/Mobile-Sensor-2026/>
 
@@ -46,7 +47,11 @@ docs/
 │   └── ios.md                #   iOS Core Motion (Swift)
 └── practice/                 # 实验实践
     ├── sensorlog.md          #   SensorLog 使用指南
+    ├── sensor-logger.md      #   Sensor Logger 使用指南 (数据上云)
     └── data-collection.md    #   数据采集实验 (计步器·指南针·气压楼层·手势识别)
+
+notebooks/
+└── sensor_demo.ipynb         # Python 演示程序集 (Colab 直接运行)
 ```
 
 ## 涵盖的传感器
@@ -69,6 +74,7 @@ docs/
 | 语言 | 中文 (zh) |
 | 数学公式 | MathJax 3 |
 | 代码示例 | Kotlin (Android)、Swift (iOS)、Python (数据分析) |
+| 交互演示 | [Google Colab Notebook](notebooks/sensor_demo.ipynb) |
 | 字体 | Noto Sans SC + JetBrains Mono |
 
 ## 本地运行
