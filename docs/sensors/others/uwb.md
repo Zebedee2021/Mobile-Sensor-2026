@@ -30,21 +30,10 @@ UWB 脉冲信号:     ╷   ╷   ╷   ╷   ╷   ╷    (极短脉冲,宽带)
 
 ### 双向测距 (TWR)
 
-```
-  设备 A                              设备 B
-    │                                    │
-    │ ─── Poll 请求 ──────────────────► │
-    │           t₁                       │  t₂
-    │                                    │
-    │ ◄── Response 响应 ──────────────── │
-    │           t₄                       │  t₃
-    │                                    │
-
-    往返时间: T_round = t₄ - t₁
-    响应延迟: T_reply = t₃ - t₂
-
-    距离: d = c × (T_round - T_reply) / 2
-```
+<figure markdown="span">
+  ![UWB TWR 双向测距](../../assets/images/uwb-ranging.png){ width="600" }
+  <figcaption>UWB 双向测距 (TWR) 原理：通过往返时间精确计算距离</figcaption>
+</figure>
 
 ### 到达角度 (AoA)
 

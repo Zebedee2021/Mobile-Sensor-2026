@@ -66,15 +66,10 @@ $$V_H = \frac{I \cdot B}{n \cdot e \cdot d}$$
 - **磁倾角 (Inclination)**: 磁场与水平面的夹角
 - **磁偏角 (Declination)**: 磁北与地理北的偏差
 
-```
-        地理北
-        ↑
-        │╲ 磁偏角 D
-        │ ╲
-        │  ╲ 磁北
-        │   ↗
-        │
-```
+<figure markdown="span">
+  ![地磁场方向与磁偏角](../../assets/images/earth-magnetic-field.png){ width="560" }
+  <figcaption>地磁场方向示意：磁北与地理北之间存在磁偏角 D</figcaption>
+</figure>
 
 | 地区 | 总磁场强度 | 水平分量 | 磁倾角 |
 |:-----|:----------|:---------|:-------|

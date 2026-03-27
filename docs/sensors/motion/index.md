@@ -35,18 +35,10 @@
 
 智能手机的运动传感器使用统一的 **设备坐标系**:
 
-```
-        +Y (屏幕向上)
-         ▲
-         │
-         │
-         │
-         ●───────► +X (屏幕向右)
-        ╱
-       ╱
-      ▼
-    +Z (屏幕朝向用户)
-```
+<figure markdown="span">
+  ![设备坐标系](../../assets/images/device-coordinate-system.png){ width="500" }
+  <figcaption>智能手机设备坐标系定义 (右手坐标系)</figcaption>
+</figure>
 
 - **X 轴**: 沿屏幕宽度方向,向右为正
 - **Y 轴**: 沿屏幕高度方向,向上为正
