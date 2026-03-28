@@ -61,6 +61,87 @@
 
 ---
 
+## 关键参数解析
+
+### 检测距离与灵敏度
+
+红外反射式传感器的接收光强遵循近似的逆平方关系:
+
+$$I_{recv} \propto \frac{P_{emit}}{r^2}$$
+
+实际检测距离受物体反射率影响较大 — 白纸的反射率 (~90%) 远高于深色衣物 (~5%),导致同一传感器对不同物体的有效距离差异显著。
+
+### 响应时间对比
+
+| 参数 | 红外反射式 | 超声波式 | 电容式 |
+|:-----|:----------|:---------|:-------|
+| 响应时间 | 1-5 ms | 10-50 ms | 5-20 ms |
+| 检测距离 | 1-10 cm | 2-30 cm | 1-5 cm |
+| 受环境光影响 | 有 (需调制) | 无 | 无 |
+| 受材质影响 | 大 (反射率) | 小 | 仅导体 |
+| 功耗 | 中 (mA级) | 高 | 极低 (μA级) |
+
+### 串扰补偿
+
+红外接近传感器中,LED 发出的光可能直接泄漏到旁边的探测器 (光学串扰),产生固定偏移。芯片通常内置 **串扰校准** (Crosstalk Calibration) 功能:
+
+1. 在无遮挡环境下,测量背景串扰值
+2. 将此值存入寄存器作为基线
+3. 后续读数减去基线,消除固定偏移
+
+---
+
+## 应用实例
+
+### 1. 迟滞阈值接近检测
+
+```python
+def proximity_threshold_detector(signal, threshold_near=200, threshold_far=100):
+    """迟滞阈值接近检测算法，避免近/远状态频繁跳变 (Schmitt 触发)
+    signal — 接近传感器原始 ADC 读数列表 (值越大表示越近)
+    """
+    is_near = False
+    events = []
+    for i, value in enumerate(signal):
+        if not is_near and value >= threshold_near:
+            is_near = True
+            events.append((i, 'NEAR', value))
+        elif is_near and value <= threshold_far:
+            is_near = False
+            events.append((i, 'FAR', value))
+    return events
+
+# 示例: 模拟手接近又离开的传感器读数
+readings = [20, 50, 120, 180, 250, 220, 150, 80, 60, 30, 15]
+for idx, state, val in proximity_threshold_detector(readings):
+    print(f"  采样 {idx}: {state} (ADC={val})")
+```
+
+### 2. 超声波回波测距
+
+```python
+def ultrasonic_distance(echo_times, speed_of_sound=343.0):
+    """超声波测距：根据回波往返时间计算距离
+    echo_times — [(发射时间, 接收时间), ...] 列表 (单位: 秒)
+    speed_of_sound — 声速 (m/s, 默认 20°C 空气中)
+    """
+    distances = []
+    for t_emit, t_recv in echo_times:
+        dt = t_recv - t_emit
+        d_cm = (speed_of_sound * dt / 2) * 100   # 转为 cm
+        distances.append(round(d_cm, 1))
+    return distances
+
+# 示例: 3 次测量 (发射时间, 接收时间)
+samples = [(0.000, 0.00058), (0.100, 0.10062), (0.200, 0.20055)]
+dists = ultrasonic_distance(samples)
+for i, d in enumerate(dists):
+    print(f"  测量 {i+1}: {d} cm")
+print(f"  平均距离: {sum(dists)/len(dists):.1f} cm")
+```
+
+---
+
 ## 延伸阅读
 
 - [AMS TMD2772 数据手册](https://ams.com/tmd27721)

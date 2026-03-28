@@ -75,6 +75,115 @@ Android 阵营的面部识别方案多样:
 
 ---
 
+## 关键参数解析
+
+### FAR 与 FRR
+
+面部识别系统的安全性由两个核心指标衡量:
+
+$$FAR = \frac{\text{错误接受次数}}{\text{冒充尝试总数}}$$
+
+$$FRR = \frac{\text{错误拒绝次数}}{\text{合法尝试总数}}$$
+
+- **FAR (False Acceptance Rate, 误识率)**: 非本人被错误接受的概率
+- **FRR (False Rejection Rate, 拒识率)**: 本人被错误拒绝的概率
+- FAR 和 FRR 通常此消彼长 — 提高安全性 (降低 FAR) 会增加误拒率 (升高 FRR)
+
+### 深度精度与点阵密度
+
+结构光深度测量基于三角测量:
+
+$$Z = \frac{f \cdot B}{d}$$
+
+其中 $f$ 为焦距, $B$ 为基线距离 (投影器与相机间距), $d$ 为视差。Face ID 投射 ~30,000 个点,在 25-50 cm 的典型使用距离上,深度分辨率约为 **0.5-1 mm**,足以区分面部的精细 3D 结构。
+
+### 活体检测 (PAD)
+
+ISO 30107 定义了 **Presentation Attack Detection (PAD)** 标准,评估面部识别系统抵御呈现攻击的能力:
+
+| 攻击方式 | 2D RGB | 结构光/ToF | Face ID |
+|:---------|:-------|:----------|:--------|
+| 打印照片 | ✗ 易被攻破 | ✓ 深度不匹配 | ✓ 深度+红外 |
+| 屏幕视频 | ✗ 易被攻破 | ✓ 深度不匹配 | ✓ 深度+红外 |
+| 3D 面具 | — | △ 部分可能通过 | ✓ 红外纹理检测 |
+| 化妆伪装 | △ | ✓ 3D 结构不变 | ✓ 3D 结构不变 |
+
+---
+
+## 方案安全性对比
+
+| 方案 | FAR | FRR | 活体检测 | 安全等级 | 可用于支付 |
+|:-----|:----|:----|:---------|:---------|:----------|
+| **Face ID** | 1/1,000,000 | ~3% | 红外+注意力+3D | 最高 | ✓ |
+| Android 结构光 | ~1/500,000 | ~5% | 3D 深度 | 高 | ✓ |
+| Android ToF | ~1/100,000 | ~5% | 3D 深度 | 中高 | ✓ (部分) |
+| 2D RGB | 1/50,000 - 1/10,000 | ~8% | 有限 | 低 | ✗ |
+
+---
+
+## 应用实例
+
+### 1. 模拟结构光深度图
+
+```python
+import numpy as np
+
+def simulate_depth_map(rows=20, cols=20, face_center=(10, 10), face_radius=7):
+    """模拟结构光面部深度图 (合成数据)
+    返回 2D 深度数组 (单位: mm, 值越小越近)
+    """
+    depth = np.full((rows, cols), 800.0)       # 背景 800mm
+    cx, cy = face_center
+    for r in range(rows):
+        for c in range(cols):
+            dist = np.sqrt((r - cx)**2 + (c - cy)**2)
+            if dist < face_radius:
+                # 椭球体模型: 鼻子最近 (~400mm), 边缘渐远
+                z = 400 + 50 * (dist / face_radius) ** 2
+                depth[r, c] = z + np.random.normal(0, 2)
+    # 文字可视化
+    symbols = '█▓▒░·'
+    d_min, d_max = depth.min(), depth.max()
+    for row in depth:
+        line = ''
+        for d in row:
+            idx = int((d - d_min) / (d_max - d_min + 1e-6) * (len(symbols) - 1))
+            line += symbols[idx]
+        print(line)
+    return depth
+
+simulate_depth_map()
+```
+
+### 2. FAR/FRR 计算
+
+```python
+import numpy as np
+
+def compute_far_frr(genuine_scores, impostor_scores, threshold):
+    """计算给定阈值下的误识率 (FAR) 和拒识率 (FRR)
+    genuine_scores  — 本人匹配评分数组 (越高越匹配)
+    impostor_scores — 冒充者匹配评分数组
+    threshold       — 判定阈值 (>= threshold 则接受)
+    """
+    far = np.mean(impostor_scores >= threshold)     # 冒充者被错误接受
+    frr = np.mean(genuine_scores < threshold)       # 本人被错误拒绝
+    return float(far), float(frr)
+
+# 示例: 模拟评分分布
+np.random.seed(42)
+genuine = np.random.normal(0.85, 0.08, 1000)       # 本人: 均值 0.85
+impostor = np.random.normal(0.35, 0.12, 1000)      # 冒充者: 均值 0.35
+
+print("阈值    FAR        FRR")
+print("-" * 30)
+for t in [0.4, 0.5, 0.6, 0.7, 0.8]:
+    far, frr = compute_far_frr(genuine, impostor, t)
+    print(f" {t:.1f}    {far:.4f}     {frr:.4f}")
+```
+
+---
+
 ## 延伸阅读
 
 - [Apple Face ID 安全性白皮书](https://support.apple.com/guide/security/face-id-and-touch-id-security-sec067eb0c9e/web)

@@ -65,6 +65,91 @@ $$\theta = \arcsin\left(\frac{c \cdot \Delta t}{d_{antenna}}\right)$$
 
 ---
 
+## 关键参数解析
+
+### 带宽与测距精度
+
+UWB 的测距精度直接与信号带宽相关。脉冲越短,时间分辨率越高:
+
+$$\Delta d_{min} = \frac{c}{2B}$$
+
+其中 $B$ 为信号带宽。当 $B$ = 500 MHz 时, $\Delta d_{min}$ = 30 cm;实际通过信号处理可达到厘米级精度。
+
+### IEEE 802.15.4z 信道
+
+| 信道号 | 中心频率 | 带宽 | 常见用途 |
+|:------|:---------|:-----|:---------|
+| 5 | 6489.6 MHz | 499.2 MHz | 欧洲/中国常用 |
+| 6 | 6988.8 MHz | 499.2 MHz | 日本/韩国 |
+| 9 | 7987.2 MHz | 499.2 MHz | 全球通用,Apple/Samsung 默认 |
+
+### STS 安全机制
+
+IEEE 802.15.4z 引入了 **STS (Scrambled Timestamp Sequence)** 安全扩展,防止中继攻击 (Relay Attack):
+
+- 每次测距使用 **加密随机序列** 作为前导码
+- 接收端验证序列合法性,攻击者无法伪造
+- 对数字车钥匙等安全场景至关重要
+
+---
+
+## 应用实例
+
+### 1. DS-TWR 双边测距
+
+```python
+def twr_ranging(t_round1, t_reply1, t_round2, t_reply2, c=3e8):
+    """双边双向测距 (DS-TWR) 距离计算
+    t_round1/t_reply1 — 第一轮发起端/响应端的往返时间和回复延迟 (秒)
+    t_round2/t_reply2 — 第二轮的往返时间和回复延迟 (秒)
+    """
+    # DS-TWR 公式消除了时钟偏移的影响
+    t_prop = (t_round1 * t_round2 - t_reply1 * t_reply2) / \
+             (t_round1 + t_round2 + t_reply1 + t_reply2)
+    distance = c * t_prop / 2
+    return distance
+
+# 示例: 模拟 3 米距离 (飞行时间 ~10ns)
+d = twr_ranging(t_round1=120e-9, t_reply1=100e-9,
+                t_round2=120e-9, t_reply2=100e-9)
+print(f"测距结果: {d:.2f} m")
+```
+
+### 2. 二维三边定位
+
+```python
+import numpy as np
+
+def trilateration_2d(anchors, distances):
+    """二维三边定位：根据 3+ 个锚点距离计算标签位置
+    anchors   — Nx2 数组, 锚点坐标 [(x1,y1), (x2,y2), ...]
+    distances — 长度 N 的数组, 到各锚点的测距值
+    返回估计位置 (x, y)
+    """
+    anchors = np.array(anchors, dtype=float)
+    distances = np.array(distances, dtype=float)
+    n = len(anchors)
+    # 以第一个锚点为参考,线性化方程组
+    A = np.zeros((n - 1, 2))
+    b = np.zeros(n - 1)
+    x0, y0, d0 = anchors[0, 0], anchors[0, 1], distances[0]
+    for i in range(1, n):
+        xi, yi, di = anchors[i, 0], anchors[i, 1], distances[i]
+        A[i-1] = [2 * (xi - x0), 2 * (yi - y0)]
+        b[i-1] = (d0**2 - di**2) - (x0**2 - xi**2) - (y0**2 - yi**2)
+    # 最小二乘求解
+    pos, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+    return pos
+
+# 示例: 3 个 UWB 锚点定位
+anchors = [(0, 0), (5, 0), (2.5, 4)]
+distances = [3.0, 4.0, 2.5]    # 到各锚点的距离 (米)
+x, y = trilateration_2d(anchors, distances)
+print(f"估计位置: ({x:.2f}, {y:.2f})")
+```
+
+---
+
 ## 延伸阅读
 
 - [Apple Nearby Interaction 框架](https://developer.apple.com/documentation/nearbyinteraction)

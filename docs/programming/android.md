@@ -18,6 +18,39 @@ Android 传感器框架位于 `android.hardware` 包中,核心类:
 
 ---
 
+## 权限管理
+
+大部分传感器 (加速度计、陀螺仪、磁力计、气压计、光传感器) **不需要**运行时权限。但以下场景需要:
+
+| 传感器/功能 | 所需权限 | 级别 |
+|:-----------|:---------|:-----|
+| 心率传感器 | `BODY_SENSORS` | 危险权限 (需运行时请求) |
+| 活动识别 | `ACTIVITY_RECOGNITION` | 危险权限 (API 29+) |
+| GPS 定位 | `ACCESS_FINE_LOCATION` | 危险权限 |
+| 后台定位 | `ACCESS_BACKGROUND_LOCATION` | 危险权限 (API 29+) |
+
+```kotlin
+// AndroidManifest.xml 中声明
+// <uses-permission android:name="android.permission.BODY_SENSORS" />
+
+fun requestSensorPermissions(activity: ComponentActivity) {
+    val permissions = arrayOf(
+        Manifest.permission.BODY_SENSORS,
+        Manifest.permission.ACTIVITY_RECOGNITION
+    )
+    val launcher = activity.registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        results.forEach { (perm, granted) ->
+            Log.d("Permission", "$perm: ${if (granted) "已授权" else "被拒绝"}")
+        }
+    }
+    launcher.launch(permissions)
+}
+```
+
+---
+
 ## 基本使用流程
 
 ### 1. 获取传感器管理器
@@ -173,6 +206,78 @@ class MultiSensorLogger : SensorEventListener {
 | PRESSURE | 气压 (hPa) | — | — |
 | LIGHT | 照度 (lux) | — | — |
 | PROXIMITY | 距离 (cm) | — | — |
+
+---
+
+## 传感器融合 API
+
+Android 提供多种 **虚拟传感器 (Composite Sensor)**,由系统融合多个物理传感器数据生成:
+
+| 类型常量 | 输出 | 融合来源 |
+|:---------|:-----|:---------|
+| `TYPE_ROTATION_VECTOR` | 四元数 (x,y,z,w) | 加速度计+陀螺仪+磁力计 |
+| `TYPE_GAME_ROTATION_VECTOR` | 四元数 (无磁校正) | 加速度计+陀螺仪 |
+| `TYPE_LINEAR_ACCELERATION` | 线性加速度 (m/s²) | 加速度计-重力 |
+| `TYPE_GRAVITY` | 重力分量 (m/s²) | 加速度计+陀螺仪 |
+| `TYPE_GEOMAGNETIC_ROTATION_VECTOR` | 四元数 (低功耗) | 加速度计+磁力计 |
+
+```kotlin
+// 获取旋转矩阵和欧拉角
+val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+
+val listener = object : SensorEventListener {
+    override fun onSensorChanged(event: SensorEvent) {
+        val rotationMatrix = FloatArray(9)
+        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+
+        val orientation = FloatArray(3)
+        SensorManager.getOrientation(rotationMatrix, orientation)
+
+        val azimuth = Math.toDegrees(orientation[0].toDouble())  // 方位角
+        val pitch = Math.toDegrees(orientation[1].toDouble())    // 俯仰
+        val roll = Math.toDegrees(orientation[2].toDouble())     // 横滚
+
+        Log.d("Fusion", "方位: ${"%.1f".format(azimuth)}°, " +
+              "俯仰: ${"%.1f".format(pitch)}°, 横滚: ${"%.1f".format(roll)}°")
+    }
+    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+}
+
+sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+```
+
+---
+
+## 批处理模式 (Batching)
+
+批处理允许传感器将数据缓存在硬件 FIFO 中,到达指定延迟后批量上报,**大幅降低功耗** (CPU 不必频繁唤醒):
+
+```kotlin
+val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+// maxReportLatencyUs: 最大报告延迟 (微秒)
+// 设为 5 秒 → 传感器每 5 秒批量上报一次
+sensorManager.registerListener(
+    listener,
+    accel,
+    SensorManager.SENSOR_DELAY_NORMAL,
+    5_000_000   // 5 秒批处理窗口
+)
+
+// 查询 FIFO 大小
+val fifoCount = accel.fifoReservedEventCount
+val fifoMax = accel.fifoMaxEventCount
+Log.d("Batch", "FIFO 预留: $fifoCount, 最大: $fifoMax 个事件")
+```
+
+| 芯片平台 | 典型 FIFO 大小 | 50Hz 下最大批处理时间 |
+|:---------|:-------------|:-------------------|
+| Snapdragon 8 Gen 2 | ~10000 事件 | ~200 s |
+| Exynos 2200 | ~4096 事件 | ~80 s |
+| Tensor G2 | ~4096 事件 | ~80 s |
+
+!!! tip "后台采集"
+    批处理模式是后台长时间传感器采集的关键。配合 `ForegroundService`,可以在用户不交互时持续记录运动数据,而不显著影响电池寿命。
 
 ---
 

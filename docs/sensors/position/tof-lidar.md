@@ -111,6 +111,97 @@ Apple LiDAR 扫描仪由三个核心组件构成:
 
 ---
 
+## 关键参数解析
+
+### 深度分辨率
+
+深度分辨率指传感器能区分的最小距离变化:
+
+| 传感器类型 | 空间分辨率 | 深度精度 | 典型产品 |
+|:-----------|:----------|:---------|:---------|
+| 单点 dToF | 1×1 | ±3mm @2m | VL53L1X |
+| 多区域 dToF | 8×8 (64区域) | ±5mm @2m | VL53L5CX |
+| iToF 相机 | VGA (640×480) | ±1% @1m | S5K33D |
+| LiDAR 面阵 | 数万点 | ~1mm @1m | Apple LiDAR |
+
+### 帧率与功耗折衷
+
+帧率越高,每帧积分时间越短,需要更大的激光功率才能维持信噪比:
+
+| 帧率 | 积分时间 | 典型功耗 | 适用场景 |
+|:-----|:---------|:---------|:---------|
+| 1 fps | 长 | ~5 mW | 静态测距、物流 |
+| 15 fps | 中 | ~50 mW | AR 遮挡渲染 |
+| 30 fps | 短 | ~100 mW | 实时手势交互 |
+| 60 fps | 极短 | ~200 mW | 高速运动追踪 |
+
+### 多径干扰 (iToF)
+
+iToF 测量相位差,但当光在场景中多次反射后到达探测器时,测量相位为多条路径的加权叠加,导致距离偏差。此外,iToF 存在 **相位缠绕** 问题 — 超过最大无歧义距离后相位会重复:
+
+$$d_{max} = \frac{c}{2 f_{mod}}$$
+
+例如调制频率 $f_{mod}$ = 20 MHz 时, $d_{max}$ = 7.5 m。超过此距离的物体会被错误地映射为更近的距离。dToF 由于直接计时,不存在相位缠绕问题。
+
+---
+
+## 应用实例
+
+### 1. ToF 深度图模拟与可视化
+
+```python
+import numpy as np
+
+def generate_depth_map(rows=8, cols=8, bg_dist=2000, obj_dist=500):
+    """模拟 VL53L5CX 8×8 多区域 ToF 深度图 (单位: mm)
+    bg_dist — 背景距离, obj_dist — 前景物体距离
+    """
+    depth = np.full((rows, cols), bg_dist, dtype=float)
+    # 在左上角放置一个 3×3 的近距物体
+    depth[1:4, 1:4] = obj_dist + np.random.normal(0, 20, (3, 3))
+    # 加入测量噪声
+    depth += np.random.normal(0, 10, (rows, cols))
+    return np.clip(depth, 0, 5000)
+
+def visualize_depth_map(depth_map):
+    """文字方式可视化深度图，距离越近字符越密"""
+    symbols = '█▓▒░ '    # 近 → 远
+    d_min, d_max = depth_map.min(), depth_map.max()
+    for row in depth_map:
+        line = ''
+        for d in row:
+            idx = int((d - d_min) / (d_max - d_min + 1e-6) * (len(symbols) - 1))
+            line += symbols[idx] * 2
+        print(line)
+
+# 示例
+dm = generate_depth_map()
+visualize_depth_map(dm)
+```
+
+### 2. 深度图障碍物检测
+
+```python
+import numpy as np
+
+def detect_obstacles(depth_map, threshold_mm=500):
+    """深度图障碍物检测：标记距离小于阈值的区域
+    返回 (obstacle_map, closest_mm, obstacle_ratio)
+    """
+    obstacle_map = depth_map < threshold_mm
+    closest_mm = float(depth_map.min())
+    total_zones = depth_map.size
+    obstacle_zones = int(np.sum(obstacle_map))
+    obstacle_ratio = obstacle_zones / total_zones
+    print(f"最近距离: {closest_mm:.0f} mm")
+    print(f"障碍物区域: {obstacle_zones}/{total_zones} ({obstacle_ratio:.1%})")
+    if obstacle_ratio > 0.3:
+        print("⚠ 警告: 大面积近距物体")
+    return obstacle_map, closest_mm, obstacle_ratio
+```
+
+---
+
 ## 延伸阅读
 
 - [ST VL53L5CX 数据手册](https://www.st.com/en/imaging-and-photonics-solutions/vl53l5cx.html)

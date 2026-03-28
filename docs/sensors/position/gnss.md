@@ -100,6 +100,103 @@ $$\rho_i = c \cdot (t_{receive} - t_{transmit}) = r_i + c \cdot \delta t$$
 
 ---
 
+## 应用实例
+
+### 1. 伪距定位最小二乘解算
+
+```python
+import numpy as np
+
+def pseudorange_position(sat_positions, pseudoranges, x0=None):
+    """伪距定位最小二乘解算 (简化版, 2D + 钟差)
+    sat_positions — Nx2 数组, 卫星位置 [(x1,y1), ...] (米)
+    pseudoranges  — 长度 N 的数组, 伪距观测值 (米)
+    x0 — 初始位置估计 [x, y, cdt], 默认原点
+    """
+    sats = np.array(sat_positions, dtype=float)
+    rho = np.array(pseudoranges, dtype=float)
+    n = len(sats)
+    x = np.array(x0 if x0 else [0.0, 0.0, 0.0])   # [x, y, c*dt]
+    for _ in range(10):  # 迭代求解
+        r = np.sqrt((sats[:, 0] - x[0])**2 + (sats[:, 1] - x[1])**2)
+        H = np.zeros((n, 3))
+        H[:, 0] = -(sats[:, 0] - x[0]) / r
+        H[:, 1] = -(sats[:, 1] - x[1]) / r
+        H[:, 2] = 1.0                                # 钟差列
+        delta_rho = rho - (r + x[2])
+        dx, _, _, _ = np.linalg.lstsq(H, delta_rho, rcond=None)
+        x += dx
+        if np.linalg.norm(dx) < 1e-6:
+            break
+    return x[0], x[1], x[2]    # (x, y, clock_bias)
+
+# 示例: 4 颗卫星定位
+sats = [(20000e3, 0), (0, 20000e3), (-15000e3, 15000e3), (10000e3, -18000e3)]
+true_pos = (100.0, 200.0)
+c_bias = 50.0   # 50m 钟差
+rho = [np.sqrt((s[0]-true_pos[0])**2 + (s[1]-true_pos[1])**2) + c_bias for s in sats]
+x, y, cb = pseudorange_position(sats, rho)
+print(f"估计位置: ({x:.1f}, {y:.1f}), 钟差: {cb:.1f} m")
+```
+
+### 2. NMEA GGA 语句解析
+
+```python
+def parse_nmea_gga(sentence):
+    """解析 NMEA GGA 语句，提取定位信息
+    返回 dict: lat, lon, alt, num_sats, quality
+    """
+    if not sentence.startswith('$GPGGA') and not sentence.startswith('$GNGGA'):
+        return None
+    fields = sentence.split(',')
+    if len(fields) < 15 or fields[6] == '0':
+        return None    # 无有效定位
+    # 纬度: ddmm.mmmm → 十进制度
+    lat_raw, lat_dir = float(fields[2]), fields[3]
+    lat = int(lat_raw / 100) + (lat_raw % 100) / 60
+    if lat_dir == 'S': lat = -lat
+    # 经度: dddmm.mmmm → 十进制度
+    lon_raw, lon_dir = float(fields[4]), fields[5]
+    lon = int(lon_raw / 100) + (lon_raw % 100) / 60
+    if lon_dir == 'W': lon = -lon
+    return {
+        'lat': lat, 'lon': lon,
+        'alt': float(fields[9]) if fields[9] else 0,
+        'num_sats': int(fields[7]),
+        'quality': int(fields[6]),
+    }
+
+# 示例
+gga = "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,47.0,M,,*47"
+result = parse_nmea_gga(gga)
+print(f"纬度: {result['lat']:.4f}°, 经度: {result['lon']:.4f}°, "
+      f"海拔: {result['alt']}m, 卫星数: {result['num_sats']}")
+```
+
+### 3. Haversine 球面距离
+
+```python
+import math
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """Haversine 公式计算两点间球面距离 (米)
+    参数为十进制度数
+    """
+    R = 6371000    # 地球平均半径 (米)
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = (math.sin(dphi / 2) ** 2 +
+         math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2)
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+# 示例: 北京天安门 → 上海东方明珠
+d = haversine_distance(39.9042, 116.4074, 31.2397, 121.4998)
+print(f"北京 → 上海: {d/1000:.1f} km")
+```
+
+---
+
 ## 延伸阅读
 
 - [GPS.gov — 官方 GPS 信息](https://www.gps.gov/)

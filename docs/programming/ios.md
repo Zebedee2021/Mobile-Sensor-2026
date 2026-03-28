@@ -26,6 +26,41 @@ Core Motion 的核心类:
 
 ---
 
+## 权限配置
+
+Core Motion 大部分传感器 (加速度计、陀螺仪、磁力计) 不需要权限。但以下功能需要在 `Info.plist` 中声明:
+
+| Key | 说明 | 何时需要 |
+|:----|:-----|:---------|
+| `NSMotionUsageDescription` | 运动数据使用说明 | CMMotionActivityManager、CMPedometer |
+| `NSLocationWhenInUseUsageDescription` | 位置使用说明 | CLLocationManager |
+| `NSLocationAlwaysAndWhenInUseUsageDescription` | 持续位置使用说明 | 后台定位 |
+
+```swift
+import CoreMotion
+
+func checkMotionPermission() {
+    // 检查运动活动权限状态
+    switch CMMotionActivityManager.authorizationStatus() {
+    case .authorized:
+        print("运动数据: 已授权")
+    case .denied:
+        print("运动数据: 被拒绝 — 请在设置中开启")
+    case .restricted:
+        print("运动数据: 受限 (家长控制等)")
+    case .notDetermined:
+        print("运动数据: 未决定 — 将在首次使用时弹窗")
+        // 触发权限请求: 创建 CMMotionActivityManager 并开始查询即可
+        let manager = CMMotionActivityManager()
+        manager.queryActivityStarting(from: Date(), to: Date(), to: .main) { _, _ in }
+    @unknown default:
+        break
+    }
+}
+```
+
+---
+
 ## 基本使用
 
 ### 1. 创建 MotionManager
@@ -162,6 +197,110 @@ if CMPedometer.isStepCountingAvailable() {
         let pace = pedometerData.currentPace   // 秒/米 (可选)
 
         print("步数: \(steps), 距离: \(distance ?? 0) m")
+    }
+}
+```
+
+---
+
+## 后台执行
+
+iOS 对后台传感器访问有严格限制。常用的后台传感器采集方案:
+
+| 后台模式 | 用途 | 限制 |
+|:---------|:-----|:-----|
+| `location` | 持续 GPS 定位 | 需要持续位置更新,状态栏显示图标 |
+| `processing` | 后台数据处理 | BGProcessingTask,系统调度执行 |
+| `bluetooth-central` | BLE 设备通信 | 可后台接收 BLE 传感器数据 |
+
+```swift
+import BackgroundTasks
+
+// 1. 在 AppDelegate 中注册后台任务
+func application(_ application: UIApplication,
+                 didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+
+    BGTaskScheduler.shared.register(
+        forTaskWithIdentifier: "com.example.sensorLog",
+        using: nil
+    ) { task in
+        self.handleSensorLogTask(task as! BGProcessingTask)
+    }
+    return true
+}
+
+// 2. 处理后台采集任务
+func handleSensorLogTask(_ task: BGProcessingTask) {
+    let motionManager = CMMotionManager()
+    motionManager.accelerometerUpdateInterval = 0.1  // 10 Hz
+    var samples: [(Double, Double, Double)] = []
+
+    motionManager.startAccelerometerUpdates(to: .main) { data, _ in
+        guard let d = data else { return }
+        samples.append((d.acceleration.x, d.acceleration.y, d.acceleration.z))
+    }
+
+    // 30 秒后结束
+    DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+        motionManager.stopAccelerometerUpdates()
+        print("后台采集完成: \(samples.count) 个样本")
+        task.setTaskCompleted(success: true)
+    }
+
+    task.expirationHandler = {
+        motionManager.stopAccelerometerUpdates()
+    }
+}
+```
+
+!!! warning "电池影响"
+    持续后台传感器采集会显著影响电池寿命。建议使用较低的采样率,并在不需要时及时停止。系统可能在电量低时终止后台任务。
+
+---
+
+## 生命周期管理
+
+正确管理传感器更新的启停,避免内存泄漏和不必要的功耗:
+
+### Push 模式 vs Pull 模式
+
+| 模式 | API | 适用场景 | 线程 |
+|:-----|:----|:---------|:-----|
+| **Push (推送)** | `startUpdates(to: queue) { handler }` | 实时响应,UI 更新 | 回调在指定队列 |
+| **Pull (轮询)** | `startUpdates()` + 访问 `.accelerometerData` | 游戏循环,自控采样 | 调用者线程 |
+
+### 生命周期绑定
+
+```swift
+class SensorViewController: UIViewController {
+
+    let motionManager = CMMotionManager()
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 页面可见时开始采集
+        guard motionManager.isDeviceMotionAvailable else { return }
+        motionManager.deviceMotionUpdateInterval = 0.02   // 50 Hz
+        motionManager.startDeviceMotionUpdates(
+            using: .xMagneticNorthZVertical,
+            to: .main
+        ) { motion, error in
+            guard let m = motion else { return }
+            print("Pitch: \(m.attitude.pitch), Roll: \(m.attitude.roll)")
+        }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // 页面不可见时停止采集 — 避免无效功耗
+        motionManager.stopDeviceMotionUpdates()
+    }
+
+    deinit {
+        // 安全清理
+        motionManager.stopDeviceMotionUpdates()
+        motionManager.stopAccelerometerUpdates()
+        motionManager.stopGyroUpdates()
     }
 }
 ```
