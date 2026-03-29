@@ -2,13 +2,35 @@
 Sensor Logger HTTP POST 接收服务
 启动: python server.py
 手机 Sensor Logger Push URL 填: http://<你的电脑IP>:8000/data
+
+数据流:
+  手机 → ngrok → server.py (8000)
+                    ├─ 写入 CSV (data/ 目录)
+                    └─ 转发 → Digital Twin 托盘程序 (localhost:8081/data)
 """
 from flask import Flask, request, jsonify
-import json, csv, os
+import json, csv, os, threading
 from datetime import datetime
+
+# ── 转发配置 ──────────────────────────────────────
+FORWARD_URL = "http://localhost:8081/data"   # Digital Twin 托盘程序端口
+FORWARD_ENABLED = True                        # 设为 False 可关闭转发
+# ─────────────────────────────────────────────────
 
 app = Flask(__name__)
 os.makedirs("data", exist_ok=True)
+
+def _forward(data: dict):
+    """后台线程转发，不阻塞主请求"""
+    try:
+        import urllib.request as _req
+        body = json.dumps(data).encode("utf-8")
+        req  = _req.Request(FORWARD_URL, data=body,
+                            headers={"Content-Type": "application/json"})
+        with _req.urlopen(req, timeout=1):
+            pass
+    except Exception:
+        pass  # 托盘程序未启动时静默忽略
 
 @app.route("/data", methods=["POST"])
 def receive():
@@ -16,6 +38,7 @@ def receive():
     sid = data.get("sessionId", "unknown")
     did = data.get("deviceId", "unknown")
 
+    # ── 写 CSV ──────────────────────────────────
     filepath = f"data/{sid}.csv"
     is_new = not os.path.exists(filepath)
 
@@ -26,9 +49,7 @@ def receive():
             w.writerow(["time_ns", "device", "sensor", "x", "y", "z", "extra"])
         for item in data.get("payload", []):
             v = item.get("values", {})
-            # values 可能是 dict 也可能是 list，统一处理
             if isinstance(v, list):
-                # list 格式: 直接存为 JSON
                 w.writerow([
                     item.get("time", ""), did, item.get("name", ""),
                     "", "", "",
@@ -52,6 +73,11 @@ def receive():
 
     now = datetime.now().strftime("%H:%M:%S")
     print(f"[{now}] {did} | {count} samples | -> {filepath}")
+
+    # ── 转发到 Digital Twin 托盘程序 ────────────
+    if FORWARD_ENABLED:
+        threading.Thread(target=_forward, args=(data,), daemon=True).start()
+
     return jsonify(status="ok"), 200
 
 @app.route("/", methods=["GET"])
@@ -61,6 +87,7 @@ def index():
 if __name__ == "__main__":
     print("=" * 50)
     print("Sensor Logger HTTP Server")
-    print("Push URL: http://<your-ip>:8000/data")
+    print(f"Push URL : http://<your-ip>:8000/data")
+    print(f"Forward  : {FORWARD_URL}  ({'ON' if FORWARD_ENABLED else 'OFF'})")
     print("=" * 50)
     app.run(host="0.0.0.0", port=8000)
