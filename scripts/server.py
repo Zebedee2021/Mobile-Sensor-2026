@@ -1,15 +1,16 @@
 """
-Sensor Logger HTTP POST 接收服务
+Sensor Logger HTTP POST 接收服务 + 实时 Dashboard
 启动: python server.py
 手机 Sensor Logger Push URL 填: http://<你的电脑IP>:8000/data
+仪表盘: http://<你的电脑IP>:8000/dashboard
 
 数据流:
   手机 → ngrok → server.py (8000)
                     ├─ 写入 CSV (data/ 目录)
                     └─ 转发 → Digital Twin 托盘程序 (localhost:8081/data)
 """
-from flask import Flask, request, jsonify
-import json, csv, os, threading
+from flask import Flask, request, jsonify, Response
+import json, csv, os, queue, threading, math, argparse
 from datetime import datetime
 
 # ── 转发配置 ──────────────────────────────────────
@@ -78,16 +79,158 @@ def receive():
     if FORWARD_ENABLED:
         threading.Thread(target=_forward, args=(data,), daemon=True).start()
 
+    # Broadcast downsampled data to SSE clients
+    downsample_and_broadcast(sid, data.get("payload", []))
+
     return jsonify(status="ok"), 200
+
+# ── SSE real-time broadcast ──────────────────────────────
+DOWNSAMPLE_STRIDE = 5        # 100Hz -> 20Hz for browser display
+MAX_QUEUE_SIZE = 50           # max buffered events per client
+clients = []                  # list of queue.Queue, one per SSE client
+clients_lock = threading.Lock()
+_t0 = {}                      # session_id -> first timestamp (ns)
+
+ORIENTATION_KEYS = {'yaw', 'pitch', 'roll', 'qw', 'qx', 'qy', 'qz'}
+XYZ_SENSORS = {'accelerometer', 'gyroscope', 'gravity',
+               'accelerometeruncalibrated', 'gyroscopeuncalibrated'}
+
+
+def broadcast(event_data):
+    """Push event to all connected SSE clients."""
+    msg = json.dumps(event_data, ensure_ascii=False)
+    with clients_lock:
+        dead = []
+        for q in clients:
+            try:
+                q.put_nowait(msg)
+            except queue.Full:
+                try:
+                    q.get_nowait()   # drop oldest
+                    q.put_nowait(msg)
+                except Exception:
+                    dead.append(q)
+        for q in dead:
+            clients.remove(q)
+
+
+def downsample_and_broadcast(sid, payload):
+    """Group payload by sensor, downsample, normalize, and broadcast via SSE."""
+    if not clients:
+        return
+
+    # Group by sensor name
+    groups = {}
+    for item in payload:
+        name = item.get("name", "")
+        groups.setdefault(name, []).append(item)
+
+    sensors = {}
+    for name, items in groups.items():
+        # Stride downsample
+        sampled = items[::DOWNSAMPLE_STRIDE]
+        if not sampled:
+            continue
+
+        # Determine t0 for this session
+        first_t = int(sampled[0].get("time", 0))
+        if sid not in _t0:
+            _t0[sid] = first_t
+
+        if name in XYZ_SENSORS:
+            fields = ["t", "x", "y", "z"]
+            data = []
+            for s in sampled:
+                v = s.get("values", {})
+                if not isinstance(v, dict):
+                    continue
+                t = round((int(s.get("time", 0)) - _t0[sid]) / 1e9, 3)
+                data.append([t,
+                             round(v.get("x", 0), 4),
+                             round(v.get("y", 0), 4),
+                             round(v.get("z", 0), 4)])
+            sensors[name] = {"fields": fields, "data": data}
+
+        elif name == "orientation":
+            fields = ["t", "yaw", "pitch", "roll"]
+            data = []
+            for s in sampled:
+                v = s.get("values", {})
+                if not isinstance(v, dict):
+                    continue
+                t = round((int(s.get("time", 0)) - _t0[sid]) / 1e9, 3)
+                data.append([t,
+                             round(math.degrees(v.get("yaw", 0)), 2),
+                             round(math.degrees(v.get("pitch", 0)), 2),
+                             round(math.degrees(v.get("roll", 0)), 2)])
+            sensors[name] = {"fields": fields, "data": data}
+
+        else:
+            # Unknown sensor: pass raw values
+            fields = ["t", "value"]
+            data = []
+            for s in sampled:
+                v = s.get("values", {})
+                t = round((int(s.get("time", 0)) - _t0[sid]) / 1e9, 3)
+                data.append([t, v])
+            sensors[name] = {"fields": fields, "data": data}
+
+    if sensors:
+        broadcast({"session": sid, "sensors": sensors})
+
+
+
+
+@app.route("/stream")
+def stream():
+    """SSE endpoint: browser connects here for real-time sensor data."""
+    q = queue.Queue(maxsize=MAX_QUEUE_SIZE)
+    with clients_lock:
+        clients.append(q)
+
+    def generate():
+        try:
+            while True:
+                try:
+                    msg = q.get(timeout=15)
+                    yield f"event: sensor_data\ndata: {msg}\n\n"
+                except queue.Empty:
+                    yield ": heartbeat\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            with clients_lock:
+                if q in clients:
+                    clients.remove(q)
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
+
+
+@app.route("/dashboard")
+def dashboard():
+    """Serve the real-time dashboard HTML."""
+    html_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
+    with open(html_path, encoding="utf-8") as f:
+        return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+
 
 @app.route("/", methods=["GET"])
 def index():
-    return "<h2>Sensor Logger Server Running</h2><p>POST data to <code>/data</code></p>", 200
+    return ('<h2>Sensor Logger Server Running</h2>'
+            '<p>POST data to <code>/data</code></p>'
+            '<p><a href="/dashboard">Open Real-time Dashboard</a></p>'), 200
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--port", type=int, default=8000)
+    args = parser.parse_args()
     print("=" * 50)
     print("Sensor Logger HTTP Server")
-    print(f"Push URL : http://<your-ip>:8000/data")
+    print(f"Push URL:   http://<your-ip>:{args.port}/data")
+    print(f"Dashboard:  http://localhost:{args.port}/dashboard")
     print(f"Forward  : {FORWARD_URL}  ({'ON' if FORWARD_ENABLED else 'OFF'})")
     print("=" * 50)
-    app.run(host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=args.port, threaded=True)
