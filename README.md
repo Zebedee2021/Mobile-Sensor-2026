@@ -93,6 +93,56 @@ mkdocs serve
 # 访问 http://127.0.0.1:8000
 ```
 
+## 传感器数据采集（5G/公网穿透）
+
+本项目支持通过 **ngrok** 实现公网穿透，让 5G 手机能够将传感器数据实时推送到本地电脑：
+
+### 快速开始
+
+1. **下载 ngrok**
+   - 访问 [ngrok.com](https://ngrok.com) 注册免费账号
+   - 下载 Windows 版 `ngrok.exe` 放到项目根目录
+
+2. **配置 authtoken**
+   ```bash
+   ngrok config add-authtoken <你的token>
+   ```
+
+3. **启动采集服务（两种方式）**
+
+   **方式一：命令行启动**
+   ```bash
+   # 终端1：启动数据接收服务
+   python scripts/server.py
+   
+   # 终端2：启动 ngrok 隧道
+   ngrok http 8080
+   ```
+
+   **方式二：系统托盘一键启动（推荐）**
+   ```bash
+   # 安装依赖后双击运行
+   pip install pystray pillow
+   python scripts/tray.py
+   ```
+   在系统托盘点击「一键启动全部」即可同时启动服务和隧道。
+
+4. **手机端配置**
+   - 打开 Sensor Logger APP
+   - Push URL 填入 ngrok 提供的公网地址（如 `https://xxx.ngrok-free.dev/data`）
+   - 开始采集，数据将实时显示在仪表盘
+
+### 功能特点
+
+| 功能 | 说明 |
+|:-----|:-----|
+| 局域网模式 | 同一 WiFi 下直接访问 `http://<电脑IP>:8080` |
+| 5G/公网模式 | 通过 ngrok 隧道，手机使用移动网络也能推送数据 |
+| 实时仪表盘 | 浏览器访问 `/dashboard` 查看传感器波形 |
+| 数据存储 | 自动保存为 CSV 文件到 `data/` 目录 |
+
+> **注意**：ngrok 免费版每次启动会分配新的公网 URL，适合教学和测试使用。
+
 ## 部署
 
 推送到 `main` 分支后，GitHub Actions 会自动构建并部署到 GitHub Pages：
