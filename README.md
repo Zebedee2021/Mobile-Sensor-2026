@@ -99,38 +99,43 @@ mkdocs serve
 
 ### 快速开始
 
-1. **下载 ngrok**
-   - 访问 [ngrok.com](https://ngrok.com) 注册免费账号
-   - 下载 Windows 版 `ngrok.exe` 放到项目根目录
-
-2. **配置 authtoken**
+1. **安装依赖**
    ```bash
-   ngrok config add-authtoken <你的token>
+   pip install flask pystray pillow
    ```
 
-3. **启动采集服务（两种方式）**
+2. **下载 ngrok** (如需公网访问)
+   - 访问 [ngrok.com](https://ngrok.com) 注册免费账号
+   - 下载 Windows 版 `ngrok.exe` 放到项目根目录
+   - 配置: `ngrok config add-authtoken <你的token>`
 
-   **方式一：命令行启动**
+3. **启动采集服务**
+
+   **方式一：双击启动（推荐）**
+   ```
+   启动托盘程序.vbs   ← 无窗口，只在系统托盘显示
+   启动托盘程序.bat   ← 显示命令行窗口
+   ```
+
+   **方式二：命令行启动**
    ```bash
-   # 终端1：启动数据接收服务
-   python scripts/server.py
+   # 系统托盘管理
+   python scripts/tray.py
    
-   # 终端2：启动 ngrok 隧道
+   # 或纯命令行
+   python scripts/server.py -p 8080
    ngrok http 8080
    ```
 
-   **方式二：系统托盘一键启动（推荐）**
-   ```bash
-   # 安装依赖后双击运行
-   pip install pystray pillow
-   python scripts/tray.py
-   ```
-   在系统托盘点击「一键启动全部」即可同时启动服务和隧道。
-
 4. **手机端配置**
-   - 打开 Sensor Logger APP
-   - Push URL 填入 ngrok 提供的公网地址（如 `https://xxx.ngrok-free.dev/data`）
-   - 开始采集，数据将实时显示在仪表盘
+   - 打开 Sensor Logger APP → 设置 → Push URL
+   - **局域网**: `http://<电脑IP>:8080/data`
+   - **5G/公网**: `https://xxx.ngrok-free.dev/data` (从托盘菜单复制)
+   - 点击 **Tap to Test Pushing** 验证连通性
+
+5. **查看仪表盘**
+   - 右键系统托盘图标 → 「打开仪表盘 (本地)」
+   - 或浏览器访问: `http://localhost:8080/dashboard`
 
 ### 功能特点
 
@@ -140,8 +145,19 @@ mkdocs serve
 | 5G/公网模式 | 通过 ngrok 隧道，手机使用移动网络也能推送数据 |
 | 实时仪表盘 | 浏览器访问 `/dashboard` 查看传感器波形 |
 | 数据存储 | 自动保存为 CSV 文件到 `data/` 目录 |
+| 一键管理 | 系统托盘图标，一键启动/停止服务和隧道 |
 
 > **注意**：ngrok 免费版每次启动会分配新的公网 URL，适合教学和测试使用。
+
+### 项目脚本说明
+
+| 脚本 | 功能 |
+|:-----|:-----|
+| `scripts/server.py` | Flask 数据接收服务 + 实时仪表盘 |
+| `scripts/tray.py` | 系统托盘管理程序 |
+| `scripts/dashboard.html` | 实时可视化仪表盘 |
+| `启动托盘程序.vbs` | 无窗口启动托盘程序 |
+| `启动托盘程序.bat` | 带命令行窗口启动 |
 
 ## 部署
 
