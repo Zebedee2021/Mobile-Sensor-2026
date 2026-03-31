@@ -94,6 +94,29 @@
 
 ---
 
+## 实验实践
+
+本课程提供完整的传感器数据采集实验环境,支持通过 **Sensor Logger** APP 将手机传感器数据实时推送到电脑进行分析和可视化。
+
+### 数据采集系统特点
+
+- :material-wifi: **局域网模式** - 同一WiFi下直接传输,低延迟
+- :material-signal-5g: **5G公网模式** - 通过ngrok隧道,手机使用移动网络也能推送
+- :material-devices: **多设备支持** - 同时接入多个手机,支持设备切换对比
+- :material-chart-line: **实时仪表盘** - 浏览器查看传感器波形,支持暂停/继续
+- :material-content-save: **自动存储** - 数据自动保存为CSV,便于后续分析
+
+### 快速开始
+
+1. 电脑上双击 `启动托盘程序.vbs`
+2. 右键托盘图标 → 「复制 Push URL (局域网)」
+3. 手机 Sensor Logger → 设置 → 粘贴URL → 测试推送
+4. 右键托盘图标 → 「打开仪表盘」查看实时数据
+
+[:octicons-arrow-right-24: 查看详细指南](practice/sensor-logger.md)
+
+---
+
 ## 技术栈
 
-本站点使用 [MkDocs](https://www.mkdocs.org/) + [Material for MkDocs](https://squidfundamental.github.io/mkdocs-material/) 构建,遵循 **Docs-as-Code** 理念,源码托管于 GitHub,通过 GitHub Actions 自动部署至 GitHub Pages。
+本站点使用 [MkDocs](https://www.mkdocs.org/) + [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) 构建,遵循 **Docs-as-Code** 理念,源码托管于 GitHub,通过 GitHub Actions 自动部署至 GitHub Pages。

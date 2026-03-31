@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>传感器实时仪表盘</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  /* ── Theme variables ─────────────────────────────────── */
+  :root {
+    --bg-body: #0f1923; --bg-card: #1a2733; --bg-header: #1a2733;
+    --bg-stats: #162029; --bg-tab: #162029; --bg-tab-active: #1a2733;
+    --border: #2a3a4a; --text: #e0e0e0; --text-muted: #8899aa;
+    --accent: #4fc3f7; --grid-line: #1e2e3e;
+    --info-bg: #1a2733; --info-border: #2a3a4a;
+  }
+  body.light {
+    --bg-body: #f0f2f5; --bg-card: #ffffff; --bg-header: #ffffff;
+    --bg-stats: #f8f9fa; --bg-tab: #f0f2f5; --bg-tab-active: #ffffff;
+    --border: #dce0e6; --text: #1a1a2e; --text-muted: #6b7280;
+    --accent: #1976d2; --grid-line: #e8ecf0;
+    --info-bg: #f8f9fc; --info-border: #dce0e6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Microsoft YaHei", sans-serif;
+         background: var(--bg-body); color: var(--text); transition: background 0.3s, color 0.3s; }
+
+  /* ── Header ──────────────────────────────────────────── */
+  .header { display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 20px; background: var(--bg-header); border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 17px; font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 14px; font-size: 13px; }
+  .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .status-dot.connected { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+  .status-dot.disconnected { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
+  .icon-btn { background: none; border: 1px solid var(--border); border-radius: 4px;
+              padding: 3px 10px; cursor: pointer; font-size: 15px; color: var(--text); }
+  .icon-btn:hover { background: var(--bg-tab); }
+  .btn { padding: 3px 12px; border: 1px solid var(--border); border-radius: 4px; background: transparent;
+         color: var(--text); cursor: pointer; font-size: 12px; }
+  .btn:hover { background: var(--bg-tab); }
+  .btn.active { background: #e74c3c; border-color: #e74c3c; color: #fff; }
+
+  /* ── Stats bar ───────────────────────────────────────── */
+  .stats { display: flex; gap: 20px; padding: 6px 20px; background: var(--bg-stats);
+           font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+  .stats .val { color: var(--accent); font-weight: 600; }
+
+  /* ── Tab bar ─────────────────────────────────────────── */
+  .tab-bar { display: flex; gap: 0; background: var(--bg-tab); border-bottom: 1px solid var(--border);
+             padding: 0 16px; }
+  .tab-btn { padding: 8px 18px; font-size: 13px; cursor: pointer; border: none; background: transparent;
+             color: var(--text-muted); border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* ── Panels ──────────────────────────────────────────── */
+  .panel { display: none; height: calc(100vh - 118px); overflow-y: auto; padding: 8px; }
+  .panel.active { display: block; }
+
+  /* Overview grid */
+  .grid-6 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; height: 100%; }
+  .grid-6 .cell { background: var(--bg-card); border-radius: 6px; border: 1px solid var(--border);
+                  display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+
+  /* Detail tab layout */
+  .detail-layout { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; min-height: 0; }
+  .chart-row .cell { background: var(--bg-card); border-radius: 6px; border: 1px solid var(--border);
+                     display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+
+  /* Common cell parts */
+  .cell-header { display: flex; justify-content: space-between; align-items: center;
+                 padding: 7px 12px; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+  .cell-header .unit { font-weight: 400; color: var(--text-muted); font-size: 11px; }
+  .cell-header .latest { font-weight: 400; font-size: 10px; color: var(--accent); font-family: monospace; }
+  .chart-wrap { flex: 1; min-height: 0; }
+  .waiting { display: flex; align-items: center; justify-content: center;
+             height: 100%; color: var(--text-muted); font-size: 13px; }
+
+  /* Info card */
+  .info-card { background: var(--info-bg); border: 1px solid var(--info-border); border-radius: 6px;
+               padding: 12px 16px; font-size: 12px; line-height: 1.8; color: var(--text-muted); flex-shrink: 0; }
+  .info-card h3 { font-size: 13px; color: var(--text); margin-bottom: 6px; font-weight: 600; }
+  .info-card strong { color: var(--text); }
+  .info-card .tag { display: inline-block; background: var(--bg-tab); border: 1px solid var(--border);
+                    border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 0 2px; color: var(--accent); }
+
+  /* Guide page */
+  .guide { max-width: 860px; margin: 0 auto; padding: 16px 8px; }
+  .guide h2 { font-size: 18px; color: var(--text); margin-bottom: 12px; font-weight: 700; }
+  .guide-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+                   padding: 16px 20px; margin-bottom: 12px; }
+  .guide-section h3 { font-size: 14px; color: var(--accent); margin-bottom: 8px; font-weight: 600; }
+  .guide-section p, .guide-section li { font-size: 13px; line-height: 1.9; color: var(--text-muted); }
+  .guide-section ol, .guide-section ul { padding-left: 20px; }
+  .guide-section li { margin-bottom: 2px; }
+  .guide-section code { background: var(--bg-tab); border: 1px solid var(--border); border-radius: 3px;
+                        padding: 1px 6px; font-size: 12px; color: var(--accent); font-family: Consolas, monospace; }
+  .guide-section .note { background: var(--bg-stats); border-left: 3px solid var(--accent);
+                         padding: 8px 12px; margin-top: 8px; border-radius: 0 4px 4px 0; font-size: 12px; }
+  .guide-arch { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .arch-card { background: var(--bg-stats); border: 1px solid var(--border); border-radius: 6px; padding: 14px;
+               text-align: center; }
+  .arch-card .arch-icon { font-size: 28px; margin-bottom: 6px; }
+  .arch-card .arch-label { font-size: 13px; font-weight: 600; color: var(--text); }
+  .arch-card .arch-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>传感器实时仪表盘</h1>
+  <div class="header-right">
+    <select id="deviceSelect" class="btn" onchange="switchDevice(this.value)">
+      <option value="all">所有设备</option>
+    </select>
+    <span><span class="status-dot disconnected" id="statusDot"></span><span id="statusText">等待连接</span></span>
+    <button class="btn" id="pauseBtn" onclick="togglePause()">暂停</button>
+    <span id="timer" style="font-family:monospace">00:00</span>
+    <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="切换主题"></button>
+    <a href="https://github.com/Zebedee2021/Mobile-Sensor-2026" target="_blank" class="btn" title="GitHub仓库">GitHub</a>
+  </div>
+</div>
+
+<!-- Stats bar -->
+<div class="stats">
+  <span>原始采样: <span class="val" id="rawRate">--</span> Hz</span>
+  <span>显示采样: <span class="val" id="dispRate">20</span> Hz</span>
+  <span>总样本: <span class="val" id="totalSamples">0</span></span>
+  <span>Session: <span class="val" id="sessionId">--</span></span>
+  <span>当前设备: <span class="val" id="currentDevice">--</span></span>
+  <span>来源: <span class="val" id="dataSource">--</span></span>
+</div>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('guide',this)">使用说明</button>
+  <button class="tab-btn" onclick="switchTab('overview',this)">总览</button>
+  <button class="tab-btn" onclick="switchTab('accel',this)">加速度计</button>
+  <button class="tab-btn" onclick="switchTab('gyro',this)">陀螺仪</button>
+  <button class="tab-btn" onclick="switchTab('gravori',this)">重力与方向</button>
+</div>
+
+<!-- ═══ Panel: Guide ═══ -->
+<div class="panel active" id="panel-guide">
+<div class="guide">
+  <h2>传感器实时数据采集系统 — 使用说明</h2>
+
+  <div class="guide-section">
+    <h3>1. 系统架构</h3>
+    <p>本系统通过 <strong>Sensor Logger</strong> App 采集手机传感器数据，经 HTTP POST 实时推送到本服务器，服务器同时保存 CSV 文件并通过 SSE 推送至本仪表盘。</p>
+    <div class="guide-arch">
+      <div class="arch-card">
+        <div class="arch-icon">&#x1F4F1;</div>
+        <div class="arch-label">手机 (Sensor Logger)</div>
+        <div class="arch-desc">采集传感器数据<br>HTTP POST 推送</div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-icon">&#x1F5A5;</div>
+        <div class="arch-label">服务器 (Flask)</div>
+        <div class="arch-desc">接收 &amp; 存储 CSV<br>SSE 推送到仪表盘</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="guide-section">
+    <h3>2. 准备工作</h3>
+    <ol>
+      <li>手机安装 <strong>Sensor Logger</strong> (iOS / Android 均可, 免费)</li>
+      <li>电脑启动服务: <code>python scripts/server.py</code> (默认端口 8000)</li>
+      <li>浏览器打开 <code>http://localhost:8000/dashboard</code></li>
+    </ol>
+  </div>
+
+  <div class="guide-section">
+    <h3>3. 局域网模式 (WiFi)</h3>
+    <p>手机和电脑连接 <strong>同一个 WiFi</strong> 网络:</p>
+    <ol>
+      <li>查看电脑局域网 IP (如 <code>192.168.1.x</code>)</li>
+      <li>Sensor Logger → Settings → Enable <strong>HTTP Push</strong></li>
+      <li>Push URL 填入: <code>http://&lt;电脑IP&gt;:8000/data</code></li>
+      <li>选择需要的传感器, 点击录制, 本页面即可看到实时波形</li>
+    </ol>
+    <div class="note">
+      <strong>查看电脑 IP:</strong> Windows 打开 CMD 输入 <code>ipconfig</code>, 找到 "IPv4 地址"; Mac 打开终端输入 <code>ifconfig en0</code>
+    </div>
+  </div>
+
+  <div class="guide-section">
+    <h3>4. 5G/4G 远程模式 (ngrok 隧道)</h3>
+    <p>手机使用移动网络, 和电脑 <strong>不在同一网络</strong>:</p>
+    <ol>
+      <li>注册 <a href="https://ngrok.com" target="_blank" style="color:var(--accent)">ngrok.com</a> 免费账号, 获取 authtoken</li>
+      <li>下载 ngrok, 配置: <code>ngrok config add-authtoken &lt;你的token&gt;</code></li>
+      <li>启动隧道: <code>ngrok http 8000</code></li>
+      <li>获得公网 URL (如 <code>https://xxx.ngrok-free.dev</code>)</li>
+      <li>Sensor Logger Push URL 填入: <code>https://xxx.ngrok-free.dev/data</code></li>
+      <li>仪表盘也可通过公网 URL 远程访问: <code>https://xxx.ngrok-free.dev/dashboard</code></li>
+    </ol>
+    <div class="note">
+      <strong>提示:</strong> ngrok 免费版有流量限制, 足够教学和测试使用。每次启动 ngrok 公网 URL 会变化。
+    </div>
+  </div>
+
+  <div class="guide-section">
+    <h3>5. Sensor Logger 设置建议</h3>
+    <ul>
+      <li><strong>HTTP Push:</strong> 免费功能, 打开即可</li>
+      <li><strong>推荐传感器:</strong> Accelerometer, Gyroscope, Gravity, Orientation</li>
+      <li><strong>采样率:</strong> 默认 100Hz, 可在 App 内调整</li>
+      <li><strong>Batch Period:</strong> 默认 1 秒推送一次 (免费版不可调)</li>
+    </ul>
+  </div>
+
+  <div class="guide-section">
+    <h3>6. 数据存储与分析</h3>
+    <p>所有接收到的数据自动保存在服务器 <code>data/</code> 目录, 每个录制 Session 生成一个 CSV 文件。</p>
+    <p>CSV 格式: <code>time_ns, device, sensor, x, y, z, extra</code></p>
+    <p>后续可使用 <code>python scripts/analyze_5g_data.py</code> 对采集数据进行离线分析出图。</p>
+  </div>
+</div>
+</div>
+
+<!-- ═══ Panel: Overview ═══ -->
+<div class="panel" id="panel-overview">
+  <div class="grid-6" id="grid-overview"></div>
+</div>
+
+<!-- ═══ Panel: Accelerometer ═══ -->
+<div class="panel" id="panel-accel">
+  <div class="detail-layout">
+    <div class="chart-row">
+      <div class="cell">
+        <div class="cell-header"><span>加速度计 (校准) <span class="unit">(m/s²)</span></span><span class="latest" id="latest-d-accelerometer"></span></div>
+        <div class="chart-wrap" id="chart-d-accelerometer"><div class="waiting" id="waiting-d-accelerometer">等待数据...</div></div>
+      </div>
+      <div class="cell">
+        <div class="cell-header"><span>加速度计 (未校准) <span class="unit">(m/s²)</span></span><span class="latest" id="latest-d-accelerometeruncalibrated"></span></div>
+        <div class="chart-wrap" id="chart-d-accelerometeruncalibrated"><div class="waiting" id="waiting-d-accelerometeruncalibrated">等待数据...</div></div>
+      </div>
+    </div>
+    <div class="info-card">
+      <h3>加速度计 (Accelerometer)</h3>
+      <strong>原理:</strong> MEMS 微机电系统, 通过测量微小质量块在加速时的位移来感知加速度, 含重力分量。<br>
+      <strong>单位:</strong> m/s², 静止时合加速度 |a| ≈ <span class="tag">9.81</span> (地球重力加速度)。<br>
+      <strong>校准 vs 未校准:</strong> 校准版已去除硬件零偏 (bias) 和比例因子误差; 未校准版为 MEMS 芯片原始输出。<br>
+      <strong>典型应用:</strong> 计步器、跌倒检测、手势识别、屏幕旋转、车辆碰撞检测。
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Panel: Gyroscope ═══ -->
+<div class="panel" id="panel-gyro">
+  <div class="detail-layout">
+    <div class="chart-row">
+      <div class="cell">
+        <div class="cell-header"><span>陀螺仪 (校准) <span class="unit">(rad/s)</span></span><span class="latest" id="latest-d-gyroscope"></span></div>
+        <div class="chart-wrap" id="chart-d-gyroscope"><div class="waiting" id="waiting-d-gyroscope">等待数据...</div></div>
+      </div>
+      <div class="cell">
+        <div class="cell-header"><span>陀螺仪 (未校准) <span class="unit">(rad/s)</span></span><span class="latest" id="latest-d-gyroscopeuncalibrated"></span></div>
+        <div class="chart-wrap" id="chart-d-gyroscopeuncalibrated"><div class="waiting" id="waiting-d-gyroscopeuncalibrated">等待数据...</div></div>
+      </div>
+    </div>
+    <div class="info-card">
+      <h3>陀螺仪 (Gyroscope)</h3>
+      <strong>原理:</strong> 利用科里奥利力效应, 测量设备绕 X/Y/Z 轴的角速度。<br>
+      <strong>单位:</strong> rad/s, 静止时各轴应接近 <span class="tag">0</span>, 快速旋转可达数 rad/s。<br>
+      <strong>校准 vs 未校准:</strong> 差异通常很小, 现代 MEMS 陀螺仪出厂校准精度已很高。通过对比可验证零偏漂移。<br>
+      <strong>典型应用:</strong> 姿态估计 (IMU)、光学防抖、导航 (惯性导航)、游戏手柄控制。
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Panel: Gravity & Orientation ═══ -->
+<div class="panel" id="panel-gravori">
+  <div class="detail-layout">
+    <div class="chart-row">
+      <div class="cell">
+        <div class="cell-header"><span>重力 <span class="unit">(m/s²)</span></span><span class="latest" id="latest-d-gravity"></span></div>
+        <div class="chart-wrap" id="chart-d-gravity"><div class="waiting" id="waiting-d-gravity">等待数据...</div></div>
+      </div>
+      <div class="cell">
+        <div class="cell-header"><span>方向 (欧拉角) <span class="unit">(deg)</span></span><span class="latest" id="latest-d-orientation"></span></div>
+        <div class="chart-wrap" id="chart-d-orientation"><div class="waiting" id="waiting-d-orientation">等待数据...</div></div>
+      </div>
+    </div>
+    <div class="info-card">
+      <h3>重力与方向 (Gravity & Orientation)</h3>
+      <strong>重力传感器:</strong> 软件虚拟传感器, 通过低通滤波从加速度计数据中分离重力分量。合向量 |G| 恒等于 <span class="tag">9.81</span>。三轴值反映设备在重力场中的朝向。<br>
+      <strong>方向传感器:</strong> 融合加速度计 + 陀螺仪 + 磁力计 (Sensor Fusion), 输出欧拉角:<br>
+      &nbsp;&nbsp;&bull; <strong>Yaw</strong> (偏航): 绕 Z 轴旋转, 即方位角/罗盘朝向, 范围 -180° ~ 180°<br>
+      &nbsp;&nbsp;&bull; <strong>Pitch</strong> (俯仰): 绕 X 轴旋转, 手机前后倾斜<br>
+      &nbsp;&nbsp;&bull; <strong>Roll</strong> (翻滚): 绕 Y 轴旋转, 手机左右倾斜<br>
+      <strong>四元数:</strong> 同时输出四元数 (qw, qx, qy, qz), 范数始终为 <span class="tag">1.0</span>, 可验证融合算法精度。
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Sensor metadata ─────────────────────────────────────
+const SENSOR_META = {
+  accelerometer:             { label: '加速度计',         unit: 'm/s²',  fields: ['X','Y','Z'] },
+  gyroscope:                 { label: '陀螺仪',           unit: 'rad/s', fields: ['X','Y','Z'] },
+  gravity:                   { label: '重力',             unit: 'm/s²',  fields: ['X','Y','Z'] },
+  orientation:               { label: '方向',             unit: 'deg',   fields: ['Yaw','Pitch','Roll'] },
+  accelerometeruncalibrated: { label: '加速度计(未校准)',  unit: 'm/s²',  fields: ['X','Y','Z'] },
+  gyroscopeuncalibrated:     { label: '陀螺仪(未校准)',    unit: 'rad/s', fields: ['X','Y','Z'] },
+};
+
+const SENSOR_ORDER = [
+  'accelerometer', 'gyroscope',
+  'gravity', 'orientation',
+  'accelerometeruncalibrated', 'gyroscopeuncalibrated'
+];
+
+const COLORS = ['#e74c3c', '#2ecc71', '#3498db'];
+const MAX_POINTS = 200;
+
+// ── State ───────────────────────────────────────────────
+const charts = {};       // chartId -> ECharts instance
+const buffers = {};      // deviceId -> sensorName -> { t:[], s0:[], s1:[], s2:[] }
+const chartSensorMap = {};  // chartId -> sensorName
+let paused = false;
+let totalSamples = 0;
+let startTime = null;
+let lastRateUpdate = 0;
+let samplesForRate = 0;
+let currentTab = 'guide';
+let currentDeviceFilter = 'all';  // 'all' 或 deviceId
+let knownDevices = {};            // deviceId -> {source, lastSeen}
+let currentDeviceId = null;       // 当前活跃设备ID
+
+// ── Theme ───────────────────────────────────────────────
+function isLight() { return document.body.classList.contains('light'); }
+
+function getThemeColors() {
+  const s = getComputedStyle(document.body);
+  return {
+    gridLine: s.getPropertyValue('--grid-line').trim(),
+    text: s.getPropertyValue('--text').trim(),
+    textMuted: s.getPropertyValue('--text-muted').trim(),
+  };
+}
+
+function applyThemeToChart(chart, meta) {
+  const tc = getThemeColors();
+  chart.setOption({
+    backgroundColor: 'transparent',
+    legend: { textStyle: { color: tc.textMuted } },
+    xAxis: { axisLabel: { color: tc.textMuted }, axisLine: { lineStyle: { color: tc.gridLine } },
+             splitLine: { lineStyle: { color: tc.gridLine } }, nameTextStyle: { color: tc.textMuted } },
+    yAxis: { axisLabel: { color: tc.textMuted }, axisLine: { lineStyle: { color: tc.gridLine } },
+             splitLine: { lineStyle: { color: tc.gridLine } } },
+  });
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  localStorage.setItem('sensor-theme', isLight() ? 'light' : 'dark');
+  updateThemeBtn();
+  // Update all charts
+  for (const id in charts) {
+    const meta = SENSOR_META[chartSensorMap[id]] || {};
+    applyThemeToChart(charts[id], meta);
+  }
+}
+
+function updateThemeBtn() {
+  document.getElementById('themeBtn').textContent = isLight() ? '\u{1F319}' : '\u{2600}\u{FE0F}';
+}
+
+// Init theme
+if (localStorage.getItem('sensor-theme') === 'light') document.body.classList.add('light');
+updateThemeBtn();
+
+// ── Chart creation ──────────────────────────────────────
+function createChart(chartId, sensorName) {
+  if (charts[chartId]) return;
+  const meta = SENSOR_META[sensorName] || { label: sensorName, unit: '', fields: ['A','B','C'] };
+  const container = document.getElementById('chart-' + chartId);
+  if (!container) return;
+
+  const w = document.getElementById('waiting-' + chartId);
+  if (w) w.style.display = 'none';
+
+  const tc = getThemeColors();
+  const chart = echarts.init(container);
+  charts[chartId] = chart;
+  chartSensorMap[chartId] = sensorName;
+
+  chart.setOption({
+    animation: false,
+    backgroundColor: 'transparent',
+    grid: { top: 10, right: 16, bottom: 28, left: 50 },
+    tooltip: { trigger: 'axis', textStyle: { fontSize: 11 } },
+    legend: { show: true, top: 0, right: 0, textStyle: { fontSize: 10, color: tc.textMuted }, data: meta.fields },
+    xAxis: {
+      type: 'value', name: 's', nameTextStyle: { fontSize: 10, color: tc.textMuted },
+      axisLabel: { fontSize: 10, color: tc.textMuted, formatter: function(v) { return v.toFixed(1); } },
+      axisLine: { lineStyle: { color: tc.gridLine } },
+      splitLine: { lineStyle: { color: tc.gridLine } },
+      min: 'dataMin', max: 'dataMax'
+    },
+    yAxis: {
+      type: 'value', scale: true,
+      axisLabel: { fontSize: 10, color: tc.textMuted },
+      axisLine: { lineStyle: { color: tc.gridLine } },
+      splitLine: { lineStyle: { color: tc.gridLine } }
+    },
+    series: meta.fields.map(function(f, i) {
+      return { name: f, type: 'line', showSymbol: false, lineStyle: { width: 1.5 }, itemStyle: { color: COLORS[i] }, data: [] };
+    })
+  });
+}
+
+// ── Device management ───────────────────────────────────
+function updateDeviceSelect() {
+  var select = document.getElementById('deviceSelect');
+  var currentVal = select.value;
+  // 保留"所有设备"选项
+  select.innerHTML = '<option value="all">所有设备</option>';
+  for (var did in knownDevices) {
+    var info = knownDevices[did];
+    var label = did.substring(0, 8);
+    if (info.source === '5g') label += ' [5G]';
+    else if (info.source === 'lan') label += ' [LAN]';
+    var opt = document.createElement('option');
+    opt.value = did;
+    opt.textContent = label;
+    select.appendChild(opt);
+  }
+  // 恢复之前的选择（如果还存在）
+  if (currentVal && (currentVal === 'all' || knownDevices[currentVal])) {
+    select.value = currentVal;
+  }
+}
+
+function switchDevice(deviceId) {
+  currentDeviceFilter = deviceId;
+  if (deviceId !== 'all') {
+    currentDeviceId = deviceId;
+  }
+  // 清空当前图表数据
+  for (var name in buffers[currentDeviceId] || {}) {
+    if (buffers[currentDeviceId] && buffers[currentDeviceId][name]) {
+      buffers[currentDeviceId][name] = { t: [], s0: [], s1: [], s2: [] };
+    }
+  }
+  // 重置图表
+  for (var id in charts) {
+    if (charts[id]) {
+      charts[id].setOption({ series: [{ data: [] }, { data: [] }, { data: [] }] });
+    }
+  }
+  console.log('[Device] Switched to:', deviceId);
+}
+
+// ── Build overview grid ─────────────────────────────────
+var overviewGrid = document.getElementById('grid-overview');
+SENSOR_ORDER.forEach(function(name) {
+  var meta = SENSOR_META[name];
+  var cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.innerHTML =
+    '<div class="cell-header"><span>' + meta.label + ' <span class="unit">(' + meta.unit + ')</span></span>' +
+    '<span class="latest" id="latest-o-' + name + '"></span></div>' +
+    '<div class="chart-wrap" id="chart-o-' + name + '"><div class="waiting" id="waiting-o-' + name + '">等待数据...</div></div>';
+  overviewGrid.appendChild(cell);
+});
+
+// ── Tab switching ───────────────────────────────────────
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('panel-' + tab).classList.add('active');
+  btn.classList.add('active');
+  // Resize visible charts after display change
+  setTimeout(function() {
+    for (var id in charts) {
+      if (charts[id]) charts[id].resize();
+    }
+  }, 50);
+}
+
+// ── Update chart data ───────────────────────────────────
+function updateChart(chartId, sensorName) {
+  var chart = charts[chartId];
+  if (!chart) return;
+
+  var deviceBuf = null;
+  if (currentDeviceFilter === 'all') {
+    // 所有设备模式：使用当前活跃设备或第一个有数据的设备
+    deviceBuf = currentDeviceId && buffers[currentDeviceId] ? buffers[currentDeviceId] : null;
+    if (!deviceBuf) {
+      // 遍历查找第一个有数据的设备
+      for (var did in buffers) {
+        if (buffers[did] && buffers[did][sensorName]) {
+          deviceBuf = buffers[did];
+          currentDeviceId = did;
+          break;
+        }
+      }
+    }
+  } else {
+    deviceBuf = buffers[currentDeviceFilter];
+  }
+
+  if (!deviceBuf || !deviceBuf[sensorName]) return;
+  var buf = deviceBuf[sensorName];
+  if (buf.t.length === 0) return;
+
+  var s0d = [], s1d = [], s2d = [];
+  for (var i = 0; i < buf.t.length; i++) {
+    s0d.push([buf.t[i], buf.s0[i]]);
+    s1d.push([buf.t[i], buf.s1[i]]);
+    s2d.push([buf.t[i], buf.s2[i]]);
+  }
+  chart.setOption({ series: [{ data: s0d }, { data: s1d }, { data: s2d }] });
+}
+
+function updateLatest(elId, sensorName) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+
+  var deviceBuf = null;
+  if (currentDeviceFilter === 'all') {
+    deviceBuf = currentDeviceId && buffers[currentDeviceId] ? buffers[currentDeviceId] : null;
+    if (!deviceBuf) {
+      for (var did in buffers) {
+        if (buffers[did] && buffers[did][sensorName]) {
+          deviceBuf = buffers[did];
+          currentDeviceId = did;
+          break;
+        }
+      }
+    }
+  } else {
+    deviceBuf = buffers[currentDeviceFilter];
+  }
+
+  if (!deviceBuf || !deviceBuf[sensorName]) return;
+  var buf = deviceBuf[sensorName];
+  if (buf.t.length === 0) return;
+  var meta = SENSOR_META[sensorName] || { fields: ['A','B','C'] };
+  el.textContent = meta.fields[0] + ':' + buf.s0[buf.s0.length-1].toFixed(2) +
+    ' ' + meta.fields[1] + ':' + buf.s1[buf.s1.length-1].toFixed(2) +
+    ' ' + meta.fields[2] + ':' + buf.s2[buf.s2.length-1].toFixed(2);
+}
+
+// ── Handle SSE data ─────────────────────────────────────
+function handleSensorData(event) {
+  var d = JSON.parse(event.data);
+  if (d.session) document.getElementById('sessionId').textContent = d.session.substring(0,8) + '...';
+  if (!startTime) startTime = performance.now();
+  if (paused) return;
+
+  // 提取设备和来源信息
+  var deviceId = d.device || 'unknown';
+  var source = d.source || 'unknown';
+
+  // 更新已知设备列表
+  if (deviceId !== 'unknown') {
+    knownDevices[deviceId] = { source: source, lastSeen: Date.now() };
+    currentDeviceId = deviceId;
+    updateDeviceSelect();
+    // 更新统计显示
+    document.getElementById('currentDevice').textContent = deviceId.substring(0, 8);
+    var sourceLabel = source === '5g' ? '5G公网' : (source === 'lan' ? '局域网' : source);
+    document.getElementById('dataSource').textContent = sourceLabel;
+  }
+
+  // 设备过滤
+  if (currentDeviceFilter !== 'all' && deviceId !== currentDeviceFilter) {
+    return; // 跳过非当前选中设备的数据
+  }
+
+  // 初始化设备缓冲区
+  if (!buffers[deviceId]) buffers[deviceId] = {};
+
+  for (var name in d.sensors) {
+    var rows = d.sensors[name].data;
+    if (!rows || rows.length === 0) continue;
+
+    samplesForRate += rows.length * 5;
+    totalSamples += rows.length * 5;
+
+    // 初始化传感器缓冲区
+    if (!buffers[deviceId][name]) buffers[deviceId][name] = { t: [], s0: [], s1: [], s2: [] };
+    var buf = buffers[deviceId][name];
+
+    for (var j = 0; j < rows.length; j++) {
+      var row = rows[j];
+      buf.t.push(row[0]);
+      buf.s0.push(row[1]);
+      buf.s1.push(row.length > 2 ? row[2] : 0);
+      buf.s2.push(row.length > 3 ? row[3] : 0);
+    }
+    while (buf.t.length > MAX_POINTS) { buf.t.shift(); buf.s0.shift(); buf.s1.shift(); buf.s2.shift(); }
+
+    // Create charts on first data if not exists
+    var overviewId = 'o-' + name;
+    var detailId = 'd-' + name;
+    if (!charts[overviewId]) createChart(overviewId, name);
+    if (document.getElementById('chart-' + detailId) && !charts[detailId]) createChart(detailId, name);
+
+    // Update overview chart (always)
+    updateChart(overviewId, name);
+    updateLatest('latest-' + overviewId, name);
+
+    // Update detail chart only if its panel is visible
+    if (charts[detailId]) {
+      updateChart(detailId, name);
+      updateLatest('latest-' + detailId, name);
+    }
+  }
+
+  document.getElementById('totalSamples').textContent = totalSamples.toLocaleString();
+}
+
+// ── SSE Connection ──────────────────────────────────────
+function connect() {
+  var source = new EventSource('/stream');
+  source.addEventListener('sensor_data', handleSensorData);
+  source.addEventListener('open', function() {
+    document.getElementById('statusDot').className = 'status-dot connected';
+    document.getElementById('statusText').textContent = '已连接';
+  });
+  source.addEventListener('error', function() {
+    document.getElementById('statusDot').className = 'status-dot disconnected';
+    document.getElementById('statusText').textContent = '重连中...';
+  });
+}
+connect();
+
+// ── Pause / Resume ──────────────────────────────────────
+function togglePause() {
+  paused = !paused;
+  var btn = document.getElementById('pauseBtn');
+  if (paused) { btn.textContent = '继续'; btn.classList.add('active'); }
+  else {
+    btn.textContent = '暂停'; btn.classList.remove('active');
+    // 清空所有设备的缓冲区
+    for (var did in buffers) {
+      for (var name in buffers[did]) {
+        buffers[did][name] = { t: [], s0: [], s1: [], s2: [] };
+      }
+    }
+  }
+}
+
+// ── Timer & Rate ────────────────────────────────────────
+setInterval(function() {
+  if (startTime) {
+    var elapsed = Math.floor((performance.now() - startTime) / 1000);
+    document.getElementById('timer').textContent =
+      String(Math.floor(elapsed/60)).padStart(2,'0') + ':' + String(elapsed%60).padStart(2,'0');
+  }
+  var now = performance.now();
+  if (lastRateUpdate > 0) {
+    var dt = (now - lastRateUpdate) / 1000;
+    document.getElementById('rawRate').textContent = Math.round(samplesForRate / dt);
+  }
+  lastRateUpdate = now;
+  samplesForRate = 0;
+}, 1000);
+
+// ── Resize ──────────────────────────────────────────────
+window.addEventListener('resize', function() {
+  for (var id in charts) { if (charts[id]) charts[id].resize(); }
+});
+</script>
+</body>
+</html>

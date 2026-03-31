@@ -33,11 +33,37 @@ def _forward(data: dict):
     except Exception:
         pass  # 托盘程序未启动时静默忽略
 
+def get_client_source():
+    """判断数据来源: 'lan' (局域网) 或 '5g' (ngrok公网)"""
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    host = request.headers.get('Host', '')
+    # ngrok 请求通常带有 X-Forwarded-For 或特定 Host
+    if forwarded or 'ngrok' in host.lower():
+        return '5g'
+    # 检查是否是本地网络IP
+    client_ip = request.remote_addr
+    if client_ip and (client_ip.startswith('192.168.') or 
+                      client_ip.startswith('10.') or 
+                      client_ip.startswith('172.')):
+        return 'lan'
+    return 'unknown'
+
+
 @app.route("/data", methods=["POST"])
 def receive():
     data = request.get_json()
     sid = data.get("sessionId", "unknown")
     did = data.get("deviceId", "unknown")
+    source = get_client_source()
+    
+    # 更新活跃设备列表
+    with devices_lock:
+        active_devices[did] = {
+            'session_id': sid,
+            'last_seen': datetime.now().isoformat(),
+            'source': source,
+            'ip': request.remote_addr
+        }
 
     # ── 写 CSV ──────────────────────────────────
     filepath = f"data/{sid}.csv"
@@ -73,14 +99,15 @@ def receive():
             count += 1
 
     now = datetime.now().strftime("%H:%M:%S")
-    print(f"[{now}] {did} | {count} samples | -> {filepath}")
+    source_label = "5G" if source == '5g' else "LAN"
+    print(f"[{now}] [{source_label}] {did} | {count} samples | -> {filepath}")
 
     # ── 转发到 Digital Twin 托盘程序 ────────────
     if FORWARD_ENABLED:
         threading.Thread(target=_forward, args=(data,), daemon=True).start()
 
-    # Broadcast downsampled data to SSE clients
-    downsample_and_broadcast(sid, data.get("payload", []))
+    # Broadcast downsampled data to SSE clients (包含设备和来源信息)
+    downsample_and_broadcast(sid, did, source, data.get("payload", []))
 
     return jsonify(status="ok"), 200
 
@@ -90,6 +117,12 @@ MAX_QUEUE_SIZE = 50           # max buffered events per client
 clients = []                  # list of queue.Queue, one per SSE client
 clients_lock = threading.Lock()
 _t0 = {}                      # session_id -> first timestamp (ns)
+
+# ── Multi-device tracking ────────────────────────────────
+# 追踪活跃设备: device_id -> {session_id, last_seen, source}
+active_devices = {}
+devices_lock = threading.Lock()
+DEVICE_TIMEOUT = 30           # 设备超时时间(秒)
 
 ORIENTATION_KEYS = {'yaw', 'pitch', 'roll', 'qw', 'qx', 'qy', 'qz'}
 XYZ_SENSORS = {'accelerometer', 'gyroscope', 'gravity',
@@ -114,7 +147,7 @@ def broadcast(event_data):
             clients.remove(q)
 
 
-def downsample_and_broadcast(sid, payload):
+def downsample_and_broadcast(sid, device_id, source, payload):
     """Group payload by sensor, downsample, normalize, and broadcast via SSE."""
     if not clients:
         return
@@ -176,7 +209,13 @@ def downsample_and_broadcast(sid, payload):
             sensors[name] = {"fields": fields, "data": data}
 
     if sensors:
-        broadcast({"session": sid, "sensors": sensors})
+        broadcast({
+            "session": sid,
+            "device": device_id,
+            "source": source,
+            "sensors": sensors
+        })
+
 
 
 
@@ -214,6 +253,22 @@ def dashboard():
     html_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
     with open(html_path, encoding="utf-8") as f:
         return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/devices")
+def get_devices():
+    """获取当前活跃设备列表"""
+    with devices_lock:
+        # 清理超时设备
+        now = datetime.now()
+        expired = []
+        for did, info in active_devices.items():
+            last = datetime.fromisoformat(info['last_seen'])
+            if (now - last).total_seconds() > DEVICE_TIMEOUT:
+                expired.append(did)
+        for did in expired:
+            del active_devices[did]
+        return jsonify(list(active_devices.items()))
 
 
 @app.route("/", methods=["GET"])
