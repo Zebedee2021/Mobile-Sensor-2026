@@ -128,9 +128,11 @@ mkdocs serve
    ```
 
 4. **手机端配置**
+   - **右键系统托盘图标** → 「复制 Push URL (局域网)」
    - 打开 Sensor Logger APP → 设置 → Push URL
-   - **局域网**: `http://<电脑IP>:8080/data`
-   - **5G/公网**: `https://xxx.ngrok-free.dev/data` (从托盘菜单复制)
+   - **粘贴**复制的地址 (格式: `http://<电脑IP>:8080/data`)
+     - ⚠️ **注意**: IP 地址由托盘程序自动检测，每台电脑不同，必须从菜单复制
+   - **5G/公网**: 同样从托盘菜单复制 ngrok URL (`https://xxx.ngrok-free.dev/data`)
    - 点击 **Tap to Test Pushing** 验证连通性
 
 5. **查看仪表盘**
