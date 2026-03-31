@@ -37,15 +37,27 @@ def get_client_source():
     """判断数据来源: 'lan' (局域网) 或 '5g' (ngrok公网)"""
     forwarded = request.headers.get('X-Forwarded-For', '')
     host = request.headers.get('Host', '')
-    # ngrok 请求通常带有 X-Forwarded-For 或特定 Host
-    if forwarded or 'ngrok' in host.lower():
+    client_ip = request.remote_addr
+    user_agent = request.headers.get('User-Agent', '')
+    
+    # ngrok 请求特征：
+    # 1. 有 X-Forwarded-For 头（包含原始客户端IP）
+    # 2. Host 包含 ngrok
+    # 3. User-Agent 包含 ngrok
+    if forwarded and forwarded != client_ip:
+        return '5g'
+    if 'ngrok' in host.lower():
+        return '5g'
+    if 'ngrok' in user_agent.lower():
         return '5g'
     # 检查是否是本地网络IP
-    client_ip = request.remote_addr
     if client_ip and (client_ip.startswith('192.168.') or 
                       client_ip.startswith('10.') or 
                       client_ip.startswith('172.')):
         return 'lan'
+    # 如果 client_ip 不是内网IP，可能是通过公网直接访问
+    if client_ip and not (client_ip.startswith('127.') or client_ip.startswith('::1')):
+        return '5g'
     return 'unknown'
 
 

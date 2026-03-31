@@ -114,8 +114,9 @@
 <div class="header">
   <h1>传感器实时仪表盘</h1>
   <div class="header-right">
+    <span style="font-size:12px;color:var(--text-muted)">设备列表:</span>
     <select id="deviceSelect" class="btn" onchange="switchDevice(this.value)">
-      <option value="all">所有设备</option>
+      <option value="">-- 选择设备 --</option>
     </select>
     <span><span class="status-dot disconnected" id="statusDot"></span><span id="statusText">等待连接</span></span>
     <button class="btn" id="pauseBtn" onclick="togglePause()">暂停</button>
@@ -421,8 +422,8 @@ function createChart(chartId, sensorName) {
 function updateDeviceSelect() {
   var select = document.getElementById('deviceSelect');
   var currentVal = select.value;
-  // 保留"所有设备"选项
-  select.innerHTML = '<option value="all">所有设备</option>';
+  // 默认选项（未选择）
+  select.innerHTML = '<option value="">-- 选择设备 --</option>';
   for (var did in knownDevices) {
     var info = knownDevices[did];
     var label = did.substring(0, 8);
@@ -433,16 +434,28 @@ function updateDeviceSelect() {
     opt.textContent = label;
     select.appendChild(opt);
   }
-  // 恢复之前的选择（如果还存在）
-  if (currentVal && (currentVal === 'all' || knownDevices[currentVal])) {
+  // 恢复之前的选择（如果还存在且不为空）
+  if (currentVal && currentVal !== '' && knownDevices[currentVal]) {
     select.value = currentVal;
+  } else {
+    select.value = ''; // 默认不选中
   }
 }
 
 function switchDevice(deviceId) {
   currentDeviceFilter = deviceId;
-  if (deviceId !== 'all') {
+  if (deviceId && deviceId !== '') {
     currentDeviceId = deviceId;
+  }
+  // 更新统计栏显示
+  if (!deviceId || deviceId === '') {
+    document.getElementById('currentDevice').textContent = '--';
+    document.getElementById('dataSource').textContent = '--';
+  } else if (knownDevices[deviceId]) {
+    document.getElementById('currentDevice').textContent = deviceId.substring(0, 8);
+    var source = knownDevices[deviceId].source;
+    var sourceLabel = source === '5g' ? '5G公网' : (source === 'lan' ? '局域网' : source);
+    document.getElementById('dataSource').textContent = sourceLabel;
   }
   // 清空当前图表数据
   for (var name in buffers[currentDeviceId] || {}) {
@@ -492,24 +505,12 @@ function updateChart(chartId, sensorName) {
   var chart = charts[chartId];
   if (!chart) return;
 
-  var deviceBuf = null;
-  if (currentDeviceFilter === 'all') {
-    // 所有设备模式：使用当前活跃设备或第一个有数据的设备
-    deviceBuf = currentDeviceId && buffers[currentDeviceId] ? buffers[currentDeviceId] : null;
-    if (!deviceBuf) {
-      // 遍历查找第一个有数据的设备
-      for (var did in buffers) {
-        if (buffers[did] && buffers[did][sensorName]) {
-          deviceBuf = buffers[did];
-          currentDeviceId = did;
-          break;
-        }
-      }
-    }
-  } else {
-    deviceBuf = buffers[currentDeviceFilter];
+  // 严格使用当前选中的设备，没有选择则不显示
+  if (!currentDeviceFilter || currentDeviceFilter === '') {
+    return; // 未选择设备，不更新图表
   }
 
+  var deviceBuf = buffers[currentDeviceFilter];
   if (!deviceBuf || !deviceBuf[sensorName]) return;
   var buf = deviceBuf[sensorName];
   if (buf.t.length === 0) return;
@@ -527,22 +528,12 @@ function updateLatest(elId, sensorName) {
   var el = document.getElementById(elId);
   if (!el) return;
 
-  var deviceBuf = null;
-  if (currentDeviceFilter === 'all') {
-    deviceBuf = currentDeviceId && buffers[currentDeviceId] ? buffers[currentDeviceId] : null;
-    if (!deviceBuf) {
-      for (var did in buffers) {
-        if (buffers[did] && buffers[did][sensorName]) {
-          deviceBuf = buffers[did];
-          currentDeviceId = did;
-          break;
-        }
-      }
-    }
-  } else {
-    deviceBuf = buffers[currentDeviceFilter];
+  // 严格使用当前选中的设备，没有选择则不显示
+  if (!currentDeviceFilter || currentDeviceFilter === '') {
+    return; // 未选择设备，不更新
   }
 
+  var deviceBuf = buffers[currentDeviceFilter];
   if (!deviceBuf || !deviceBuf[sensorName]) return;
   var buf = deviceBuf[sensorName];
   if (buf.t.length === 0) return;
@@ -563,19 +554,27 @@ function handleSensorData(event) {
   var deviceId = d.device || 'unknown';
   var source = d.source || 'unknown';
 
-  // 更新已知设备列表
+  // 更新已知设备列表（只更新列表，不切换当前显示）
   if (deviceId !== 'unknown') {
+    var isNewDevice = !knownDevices[deviceId];
     knownDevices[deviceId] = { source: source, lastSeen: Date.now() };
-    currentDeviceId = deviceId;
-    updateDeviceSelect();
-    // 更新统计显示
-    document.getElementById('currentDevice').textContent = deviceId.substring(0, 8);
-    var sourceLabel = source === '5g' ? '5G公网' : (source === 'lan' ? '局域网' : source);
-    document.getElementById('dataSource').textContent = sourceLabel;
+    // 只有新设备加入时才更新下拉框，避免频繁刷新
+    if (isNewDevice) {
+      updateDeviceSelect();
+    }
+    // 只有当前选中了这个设备，才更新统计显示
+    if (currentDeviceFilter === deviceId) {
+      document.getElementById('currentDevice').textContent = deviceId.substring(0, 8);
+      var sourceLabel = source === '5g' ? '5G公网' : (source === 'lan' ? '局域网' : source);
+      document.getElementById('dataSource').textContent = sourceLabel;
+    }
   }
 
-  // 设备过滤
-  if (currentDeviceFilter !== 'all' && deviceId !== currentDeviceFilter) {
+  // 设备过滤 - 如果没有选择设备，不显示任何数据
+  if (!currentDeviceFilter || currentDeviceFilter === '') {
+    return; // 未选择设备，不显示数据
+  }
+  if (deviceId !== currentDeviceFilter) {
     return; // 跳过非当前选中设备的数据
   }
 
