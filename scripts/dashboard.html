@@ -171,8 +171,9 @@
     <h3>2. 准备工作</h3>
     <ol>
       <li>手机安装 <strong>Sensor Logger</strong> (iOS / Android 均可, 免费)</li>
-      <li>电脑启动服务: <code>python scripts/server.py</code> (默认端口 8000)</li>
-      <li>浏览器打开 <code>http://localhost:8000/dashboard</code></li>
+      <li>电脑双击 <code>启动托盘程序.vbs</code> (无窗口) 或 <code>启动托盘程序.bat</code> (有窗口)</li>
+      <li>系统托盘出现 "S" 图标，右键可管理服务</li>
+      <li>浏览器自动打开仪表盘，或访问 <code>http://localhost:8080/dashboard</code></li>
     </ol>
   </div>
 
@@ -180,13 +181,14 @@
     <h3>3. 局域网模式 (WiFi)</h3>
     <p>手机和电脑连接 <strong>同一个 WiFi</strong> 网络:</p>
     <ol>
-      <li>查看电脑局域网 IP (如 <code>192.168.1.x</code>)</li>
+      <li>右键系统托盘图标 → 「复制 Push URL (局域网)」</li>
       <li>Sensor Logger → Settings → Enable <strong>HTTP Push</strong></li>
-      <li>Push URL 填入: <code>http://&lt;电脑IP&gt;:8000/data</code></li>
+      <li>Push URL <strong>粘贴</strong>复制的地址 (格式: <code>http://&lt;电脑IP&gt;:8080/data</code>)</li>
+      <li>点击 <strong>Tap to Test Pushing</strong> 验证连通性</li>
       <li>选择需要的传感器, 点击录制, 本页面即可看到实时波形</li>
     </ol>
     <div class="note">
-      <strong>查看电脑 IP:</strong> Windows 打开 CMD 输入 <code>ipconfig</code>, 找到 "IPv4 地址"; Mac 打开终端输入 <code>ifconfig en0</code>
+      <strong>注意:</strong> IP 地址由托盘程序自动检测，每台电脑不同，必须从菜单复制。支持多设备同时接入。
     </div>
   </div>
 
@@ -195,19 +197,33 @@
     <p>手机使用移动网络, 和电脑 <strong>不在同一网络</strong>:</p>
     <ol>
       <li>注册 <a href="https://ngrok.com" target="_blank" style="color:var(--accent)">ngrok.com</a> 免费账号, 获取 authtoken</li>
-      <li>下载 ngrok, 配置: <code>ngrok config add-authtoken &lt;你的token&gt;</code></li>
-      <li>启动隧道: <code>ngrok http 8000</code></li>
-      <li>获得公网 URL (如 <code>https://xxx.ngrok-free.dev</code>)</li>
-      <li>Sensor Logger Push URL 填入: <code>https://xxx.ngrok-free.dev/data</code></li>
-      <li>仪表盘也可通过公网 URL 远程访问: <code>https://xxx.ngrok-free.dev/dashboard</code></li>
+      <li>下载 ngrok.exe 放到项目根目录，配置: <code>ngrok config add-authtoken &lt;你的token&gt;</code></li>
+      <li>右键托盘图标 → 「启动 ngrok 隧道」</li>
+      <li>等待托盘提示 "ngrok 就绪"，然后右键 → 「复制 Push URL (5G)」</li>
+      <li>Sensor Logger Push URL 粘贴复制的公网地址</li>
+      <li>仪表盘也可通过公网 URL 远程访问</li>
     </ol>
     <div class="note">
-      <strong>提示:</strong> ngrok 免费版有流量限制, 足够教学和测试使用。每次启动 ngrok 公网 URL 会变化。
+      <strong>提示:</strong> ngrok 免费版每次启动 URL 会变化，适合教学测试。支持 LAN + 5G 双模式同时接入。
     </div>
   </div>
 
   <div class="guide-section">
-    <h3>5. Sensor Logger 设置建议</h3>
+    <h3>5. 多设备使用</h3>
+    <p>本系统支持 <strong>多个手机同时接入</strong>，分别查看各设备数据:</p>
+    <ol>
+      <li>从「设备列表」下拉框选择要查看的设备 (显示 [LAN] 或 [5G] 标识)</li>
+      <li>未选择设备时，图表显示「等待数据...」</li>
+      <li>切换设备时，图表自动清空并加载新设备数据</li>
+      <li>每个设备独立显示，数据互不干扰</li>
+    </ol>
+    <div class="note">
+      <strong>提示:</strong> 可同时打开 localhost 和 ngrok 两个页面，分别选择不同设备对比查看。
+    </div>
+  </div>
+
+  <div class="guide-section">
+    <h3>6. Sensor Logger 设置建议</h3>
     <ul>
       <li><strong>HTTP Push:</strong> 免费功能, 打开即可</li>
       <li><strong>推荐传感器:</strong> Accelerometer, Gyroscope, Gravity, Orientation</li>
@@ -217,7 +233,7 @@
   </div>
 
   <div class="guide-section">
-    <h3>6. 数据存储与分析</h3>
+    <h3>7. 数据存储与分析</h3>
     <p>所有接收到的数据自动保存在服务器 <code>data/</code> 目录, 每个录制 Session 生成一个 CSV 文件。</p>
     <p>CSV 格式: <code>time_ns, device, sensor, x, y, z, extra</code></p>
     <p>后续可使用 <code>python scripts/analyze_5g_data.py</code> 对采集数据进行离线分析出图。</p>
